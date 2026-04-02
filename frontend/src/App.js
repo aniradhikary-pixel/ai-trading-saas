@@ -15,13 +15,52 @@ function App() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [performance, setPerformance] = useState(null);
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem("signalHistory");
-    if (savedHistory) {
-      setHistory(JSON.parse(savedHistory));
-    }
+  fetchHistory();
+  fetchPerformance();
   }, []);
+
+  const cardStyle = {
+    background: "#111827",
+    borderRadius: "12px",
+    padding: "15px",
+    textAlign: "center",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.4)"
+  };
+
+  const cardLabel = {
+    fontSize: "12px",
+    color: "#9ca3af",
+    marginBottom: "5px"
+  };
+
+  const cardValue = {
+    fontSize: "20px",
+    fontWeight: "bold",
+    color: "#fff"
+  };
+
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/history");
+      const data = await res.json();
+      setHistory(data);
+    } catch (err) {
+      console.error("Error fetching history:", err);
+    }
+  };
+
+  const fetchPerformance = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/performance");
+      const data = await res.json();
+      setPerformance(data);
+    } catch (err) {
+      console.error("Error fetching performance:", err);
+    }
+  };
 
   const getSignalColor = (signal) => {
     if (signal === "BUY") return "#16a34a";
@@ -42,32 +81,10 @@ function App() {
 
       const result = await response.json();
       setData(result);
+      await fetchHistory();
+      await fetchPerformance();
 
-      const newEntry = {
-        id: Date.now(),
-        requested_coin: result.requested_coin || coin,
-        coin_used: result.coin_used || coin,
-        signal: result.signal || "HOLD",
-        status: result.status || "UNKNOWN",
-        entry: result.entry || 0,
-        stop: result.stop || 0,
-        target: result.target || 0,
-        confidence: result.confidence || "N/A",
-        current_price: result.current_price || 0,
-        signal_time: result.signal_time || null,
-        candles_ago: result.candles_ago ?? null,
-        interval: result.interval || "",
-        fetched_at: result.fetched_at || new Date().toLocaleString(),
-        saved_at: new Date().toLocaleString(),
-      };
-
-      const existingHistory = JSON.parse(
-        localStorage.getItem("signalHistory") || "[]"
-      );
-      const updatedHistory = [newEntry, ...existingHistory].slice(0, 10);
-
-      setHistory(updatedHistory);
-      localStorage.setItem("signalHistory", JSON.stringify(updatedHistory));
+      
     } catch (err) {
       setError(err.message || "Something went wrong.");
       console.error("Fetch error:", err);
@@ -414,6 +431,62 @@ function App() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+          </div>
+        )}
+        
+        {performance && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: "15px",
+            marginBottom: "20px"
+          }}>
+                        
+            {/* Total Trades */}
+            <div style={cardStyle}>
+              <div style={cardLabel}>Total Trades</div>
+              <div style={cardValue}>{performance.total_trades}</div>
+            </div>
+
+            {/* Wins */}
+            <div style={cardStyle}>
+              <div style={cardLabel}>Wins</div>
+              <div style={{ ...cardValue, color: "#22c55e" }}>
+                {performance.wins}
+              </div>
+            </div>
+
+            {/* Losses */}
+            <div style={cardStyle}>
+              <div style={cardLabel}>Losses</div>
+              <div style={{ ...cardValue, color: "#ef4444" }}>
+                {performance.losses}
+              </div>
+            </div>
+
+            {/* Win Rate */}
+            <div style={cardStyle}>
+              <div style={cardLabel}>Win Rate</div>
+              <div style={{ ...cardValue, color: "#38bdf8" }}>
+              {performance.win_rate}%
+              </div>
+            </div>
+           
+            <div style={cardStyle}>
+              <div style={cardLabel}>Profit %</div>
+              <div style={{ ...cardValue, color: "#22c55e" }}>
+                {performance.total_profit_pct}%
+              </div>
+            </div>
+
+            {/* Avg RR */}
+            <div style={cardStyle}>
+              <div style={cardLabel}>Avg RR</div>
+              <div style={{ ...cardValue, color: "#a78bfa" }}>
+                {performance.avg_rr}
+              </div>
+            </div>
+
           </div>
         )}
 

@@ -1,6 +1,9 @@
 import requests
 import pandas as pd
-
+from database import get_connection
+from datetime import datetime
+TELEGRAM_BOT_TOKEN = "8583692312:AAGNR-BPMggnNCRcVhFexKybXnh7KuCpe6M"
+TELEGRAM_CHAT_ID = "808324636"
 
 BASE_URL = "https://data-api.binance.vision"
 
@@ -31,7 +34,146 @@ COIN_CONFIG = {
     },
 }
 
+from database import get_connection
 
+
+def save_signal_to_db(signal_data: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM signal_history
+        WHERE coin_used = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (signal_data.get("coin_used"),))
+
+    last_row = cursor.fetchone()
+
+    same_trade = False
+
+    if last_row:
+        same_trade = (
+            last_row["signal"] == signal_data.get("signal")
+            and last_row["signal_time"] == signal_data.get("signal_time")
+            and last_row["coin_used"] == signal_data.get("coin_used")
+        )
+
+    if same_trade:
+        cursor.execute("""
+            UPDATE signal_history
+            SET requested_coin = ?,
+                symbol = ?,
+                interval = ?,
+                strategy = ?,
+                current_price = ?,
+                ema_fast = ?,
+                ema_slow = ?,
+                ema200 = ?,
+                rr = ?,
+                stop_pct = ?,
+                entry = ?,
+                stop = ?,
+                target = ?,
+                status = ?,
+                confidence = ?,
+                candles_ago = ?,
+                fetched_at = ?
+            WHERE id = ?
+        """, (
+            signal_data.get("requested_coin"),
+            signal_data.get("symbol"),
+            signal_data.get("interval"),
+            signal_data.get("strategy"),
+            signal_data.get("current_price"),
+            signal_data.get("ema_fast"),
+            signal_data.get("ema_slow"),
+            signal_data.get("ema200"),
+            signal_data.get("rr"),
+            signal_data.get("stop_pct"),
+            signal_data.get("entry"),
+            signal_data.get("stop"),
+            signal_data.get("target"),
+            signal_data.get("status"),
+            signal_data.get("confidence"),
+            signal_data.get("candles_ago"),
+            signal_data.get("fetched_at"),
+            last_row["id"],
+        ))
+    else:
+        cursor.execute("""
+            INSERT INTO signal_history (
+                requested_coin, coin_used, symbol, interval, strategy,
+                current_price, signal, ema_fast, ema_slow, ema200,
+                rr, stop_pct, entry, stop, target,
+                status, confidence, signal_time, candles_ago, fetched_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            signal_data.get("requested_coin"),
+            signal_data.get("coin_used"),
+            signal_data.get("symbol"),
+            signal_data.get("interval"),
+            signal_data.get("strategy"),
+            signal_data.get("current_price"),
+            signal_data.get("signal"),
+            signal_data.get("ema_fast"),
+            signal_data.get("ema_slow"),
+            signal_data.get("ema200"),
+            signal_data.get("rr"),
+            signal_data.get("stop_pct"),
+            signal_data.get("entry"),
+            signal_data.get("stop"),
+            signal_data.get("target"),
+            signal_data.get("status"),
+            signal_data.get("confidence"),
+            signal_data.get("signal_time"),
+            signal_data.get("candles_ago"),
+            signal_data.get("fetched_at"),
+        ))
+
+    conn.commit()
+    conn.close()
+
+def send_telegram_alert(signal_data: dict):
+    try:
+        raw_time = signal_data.get("signal_time")
+
+        # Convert timestamp
+        if raw_time:
+            readable_time = datetime.fromtimestamp(raw_time / 1000).strftime("%d/%m/%Y, %I:%M %p")
+        else:
+            readable_time = "N/A"
+
+        message = f"""
+🚨 New Trade Signal
+
+Coin: {signal_data.get("coin_used")}
+Signal: {signal_data.get("signal")}
+Interval: {signal_data.get("interval")}
+Entry: {signal_data.get("entry")}
+Stop: {signal_data.get("stop")}
+Target: {signal_data.get("target")}
+Status: {signal_data.get("status")}
+Confidence: {signal_data.get("confidence")}
+Signal Time: {readable_time}
+"""
+
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message
+        }
+
+        response = requests.post(url, data=payload, timeout=10)
+        return response.json()
+
+    except Exception as e:
+        print("Telegram alert error:", e)
+        return None
+    
 def get_klines(symbol: str, interval: str, limit: int = 300) -> pd.DataFrame:
     url = f"{BASE_URL}/api/v3/klines"
     params = {
