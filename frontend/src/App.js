@@ -9,6 +9,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+const API_BASE_URL = "https://ai-trading-saas-production.up.railway.app";
+
 function App() {
   const [coin, setCoin] = useState("BTC");
   const [data, setData] = useState(null);
@@ -44,7 +46,7 @@ function App() {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/history");
+      const res = await fetch(`${API_BASE_URL}/history`);
       const data = await res.json();
       setHistory(data);
     } catch (err) {
@@ -54,7 +56,7 @@ function App() {
 
   const fetchPerformance = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/performance");
+      const res = await fetch(`${API_BASE_URL}/performance`);
       const data = await res.json();
       setPerformance(data);
     } catch (err) {
@@ -73,7 +75,7 @@ function App() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(`http://127.0.0.1:8000/signal/${coin}`);
+      const response = await fetch(`${API_BASE_URL}/signal/${coin}`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch signal from backend.");
