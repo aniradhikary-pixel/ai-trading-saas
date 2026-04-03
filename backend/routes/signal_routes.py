@@ -28,29 +28,30 @@ def get_signal(coin: str):
 
     return final_result
 
-@router.get("/history")
-def get_history():
+@router.get("/history/{coin}")
+def get_history(coin: str):
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT *
         FROM signal_history
+        WHERE coin_used = ?
         ORDER BY id DESC
-        LIMIT 50
-    """)
+        LIMIT 20
+    """, (coin.upper(),))
 
     rows = cursor.fetchall()
     conn.close()
 
     return [dict(row) for row in rows]
 
-@router.get("/performance")
-def get_performance():
+@router.get("/performance/{coin}")
+def get_performance(coin: str):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM signal_history ORDER BY id ASC")
+    cursor.execute("SELECT * FROM signal_history WHERE coin_used = ? ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
 

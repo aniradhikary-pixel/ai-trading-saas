@@ -22,7 +22,7 @@ function App() {
   useEffect(() => {
   fetchHistory();
   fetchPerformance();
-  }, []);
+  }, [coin]);
 
   const cardStyle = {
     background: "#111827",
@@ -46,7 +46,7 @@ function App() {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/history`);
+      const res = await fetch(`${API_BASE_URL}/history/${coin}`);
       const data = await res.json();
       setHistory(data);
     } catch (err) {
@@ -56,7 +56,7 @@ function App() {
 
   const fetchPerformance = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/performance`);
+      const res = await fetch(`${API_BASE_URL}/performance/${coin}`);
       const data = await res.json();
       setPerformance(data);
     } catch (err) {
@@ -96,8 +96,7 @@ function App() {
   };
 
   const clearHistory = () => {
-    localStorage.removeItem("signalHistory");
-    setHistory([]);
+    alert("History is stored on server. Cannot clear from frontend.");
   };
 
   const chartData =
@@ -488,6 +487,24 @@ function App() {
                 {performance.avg_rr}
               </div>
             </div>
+            
+            <h3 style={{ marginTop: "20px" }}>Equity Curve</h3>
+
+            <div style={{ width: "100%", height: 300 }}>
+              <ResponsiveContainer>
+                <LineChart
+                  data={performance.equity_curve.map((value, index) => ({
+                    step: index + 1,
+                    equity: value
+                  }))}
+                >
+                  <XAxis dataKey="step" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line dataKey="equity" stroke="#22c55e" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
           </div>
         )}
@@ -555,7 +572,7 @@ function App() {
                   </div>
 
                   <div style={{ ...mutedTextStyle, color: "#94a3b8" }}>
-                    <strong>Saved At:</strong> {item.saved_at}
+                    <strong>Fetched At:</strong> {item.fetched_at || "-"}
                   </div>
                 </div>
               ))}
