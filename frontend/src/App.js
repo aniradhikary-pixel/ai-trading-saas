@@ -436,77 +436,85 @@ function App() {
         )}
         
         {performance && (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-            gap: "15px",
-            marginBottom: "20px"
-          }}>
-                        
-            {/* Total Trades */}
-            <div style={cardStyle}>
-              <div style={cardLabel}>Total Trades</div>
-              <div style={cardValue}>{performance.total_trades}</div>
-            </div>
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: "15px",
+                marginBottom: "20px",
+              }}
+            >
+              <div style={cardStyle}>
+                <div style={cardLabel}>Total Trades</div>
+                <div style={cardValue}>{performance.total_trades}</div>
+              </div>
 
-            {/* Wins */}
-            <div style={cardStyle}>
-              <div style={cardLabel}>Wins</div>
-              <div style={{ ...cardValue, color: "#22c55e" }}>
-                {performance.wins}
+              <div style={cardStyle}>
+                <div style={cardLabel}>Wins</div>
+                <div style={{ ...cardValue, color: "#22c55e" }}>
+                  {performance.wins}
+                </div>
+              </div>
+
+              <div style={cardStyle}>
+                <div style={cardLabel}>Losses</div>
+                <div style={{ ...cardValue, color: "#ef4444" }}>
+                  {performance.losses}
+                </div>
+              </div>
+
+              <div style={cardStyle}>
+                <div style={cardLabel}>Win Rate</div>
+                <div style={{ ...cardValue, color: "#38bdf8" }}>
+                  {performance.win_rate}%
+                </div>
+              </div>
+
+              <div style={cardStyle}>
+                <div style={cardLabel}>Profit %</div>
+                <div style={{ ...cardValue, color: "#22c55e" }}>
+                  {performance.total_profit_pct}%
+                </div>
+              </div>
+
+              <div style={cardStyle}>
+                <div style={cardLabel}>Avg RR</div>
+                <div style={{ ...cardValue, color: "#a78bfa" }}>
+                  {performance.avg_rr}
+                </div>
               </div>
             </div>
 
-            {/* Losses */}
-            <div style={cardStyle}>
-              <div style={cardLabel}>Losses</div>
-              <div style={{ ...cardValue, color: "#ef4444" }}>
-                {performance.losses}
+            <div style={panelStyle}>
+              <div style={panelHeaderStyle}>
+                <h2 style={sectionTitleStyle}>Equity Curve</h2>
+              </div>
+
+              <div style={{ width: "100%", height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={(performance.equity_curve || []).map((value, index) => ({
+                      step: index + 1,
+                      equity: value,
+                    }))}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="step" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="equity"
+                      stroke="#22c55e"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             </div>
-
-            {/* Win Rate */}
-            <div style={cardStyle}>
-              <div style={cardLabel}>Win Rate</div>
-              <div style={{ ...cardValue, color: "#38bdf8" }}>
-              {performance.win_rate}%
-              </div>
-            </div>
-           
-            <div style={cardStyle}>
-              <div style={cardLabel}>Profit %</div>
-              <div style={{ ...cardValue, color: "#22c55e" }}>
-                {performance.total_profit_pct}%
-              </div>
-            </div>
-
-            {/* Avg RR */}
-            <div style={cardStyle}>
-              <div style={cardLabel}>Avg RR</div>
-              <div style={{ ...cardValue, color: "#a78bfa" }}>
-                {performance.avg_rr}
-              </div>
-            </div>
-            
-            <h3 style={{ marginTop: "20px" }}>Equity Curve</h3>
-
-            <div style={{ width: "100%", height: 300 }}>
-              <ResponsiveContainer>
-                <LineChart
-                  data={performance.equity_curve.map((value, index) => ({
-                    step: index + 1,
-                    equity: value
-                  }))}
-                >
-                  <XAxis dataKey="step" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line dataKey="equity" stroke="#22c55e" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-          </div>
+          </>
         )}
 
         <div style={panelStyle}>
