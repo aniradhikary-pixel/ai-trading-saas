@@ -22,7 +22,10 @@ def get_signal(coin: str):
 
     if "error" not in final_result:
         is_new_trade = save_signal_to_db(final_result)
-        send_telegram_alert(final_result)
+
+        if is_new_trade:
+            send_telegram_alert(final_result)
+
     return final_result
 
 @router.get("/history")
@@ -108,3 +111,4 @@ def get_performance():
         "equity_curve": equity_curve,
         "avg_rr": round(avg_rr, 2),
     }
+

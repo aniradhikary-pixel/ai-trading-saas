@@ -1,9 +1,14 @@
+import os
 import requests
-import pandas as pd
-from database import get_connection
 from datetime import datetime
-TELEGRAM_BOT_TOKEN = "8583692312:AAGNR-BPMggnNCRcVhFexKybXnh7KuCpe6M"
-TELEGRAM_CHAT_ID = "808324636"
+from dotenv import load_dotenv
+from database import get_connection
+import pandas as pd
+
+load_dotenv()
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 BASE_URL = "https://data-api.binance.vision"
 
@@ -101,6 +106,10 @@ def save_signal_to_db(signal_data: dict):
             signal_data.get("fetched_at"),
             last_row["id"],
         ))
+        conn.commit()
+        conn.close()
+        return False
+
     else:
         cursor.execute("""
             INSERT INTO signal_history (
@@ -132,15 +141,18 @@ def save_signal_to_db(signal_data: dict):
             signal_data.get("candles_ago"),
             signal_data.get("fetched_at"),
         ))
-
-    conn.commit()
-    conn.close()
-
+        conn.commit()
+        conn.close()
+        return True
+    
 def send_telegram_alert(signal_data: dict):
     try:
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+            print("Telegram credentials missing in .env")
+            return None
+
         raw_time = signal_data.get("signal_time")
 
-        # Convert timestamp
         if raw_time:
             readable_time = datetime.fromtimestamp(raw_time / 1000).strftime("%d/%m/%Y, %I:%M %p")
         else:
@@ -171,7 +183,7 @@ Signal Time: {readable_time}
         return response.json()
 
     except Exception as e:
-        print("Telegram alert error:", e)
+        print("Telegram error:", e)
         return None
     
 def get_klines(symbol: str, interval: str, limit: int = 300) -> pd.DataFrame:
@@ -353,6 +365,36 @@ def generate_trading_signal(coin: str = "BTC") -> dict:
             "candles_ago": candles_ago,
             "recent_prices": recent_prices,
         }
-
     except Exception as e:
         return {"error": str(e)}
+    
+def run_auto_signal_scan():
+    coins = ["BTC", "ETH", "SOL"]
+
+    for coin in coins:
+        try:
+            result = generate_trading_signal(coin=coin)
+
+            if "error" in result:
+                print(f"Error for {coin}: {result['error']}")
+                continue
+
+            from datetime import datetime
+            fetched_at = datetime.now().strftime("%d/%m/%Y, %I:%M:%S %p")
+
+            final_result = {
+                **result,
+                "fetched_at": fetched_at
+            }
+
+            is_new_trade = save_signal_to_db(final_result)
+
+            if is_new_trade:
+                send_telegram_alert(final_result)
+                print(f"New trade alert sent for {coin}")
+            else:
+                print(f"No new trade for {coin}")
+
+        except Exception as e:
+            print(f"Auto scan error for {coin}: {e}")
+
