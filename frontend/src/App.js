@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -15,96 +15,157 @@ function App() {
   const [coin, setCoin] = useState("BTC");
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [overallPerformance, setOverallPerformance] = useState(null);
+  const [coinPerformance, setCoinPerformance] = useState(null);
+  const [loadingSignal, setLoadingSignal] = useState(false);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [error, setError] = useState("");
-  const [performance, setPerformance] = useState(null);
 
-  
-  const cardStyle = {
-    background: "#111827",
-    borderRadius: "12px",
-    padding: "15px",
-    textAlign: "center",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.4)"
-  };
-
-  const cardLabel = {
-    fontSize: "12px",
-    color: "#9ca3af",
-    marginBottom: "5px"
-  };
-
-  const cardValue = {
-    fontSize: "20px",
-    fontWeight: "bold",
-    color: "#fff"
-  };
-
-  const fetchHistory = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/history/${coin}`);
-      const data = await res.json();
-      setHistory(data);
-    } catch (err) {
-      console.error("Error fetching history:", err);
-    }
-  }, [coin]);
-
-  const fetchPerformance = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/performance/${coin}`);
-      const data = await res.json();
-      setPerformance(data);
-    } catch (err) {
-      console.error("Error fetching performance:", err);
-    }
-  }, [coin]);
-  
-  useEffect(() => {
-    fetchHistory();
-    fetchPerformance();
-  }, [fetchHistory, fetchPerformance]);
-  
   const getSignalColor = (signal) => {
     if (signal === "BUY") return "#16a34a";
     if (signal === "SELL") return "#dc2626";
     return "#64748b";
   };
 
+  const getStatusColor = (status) => {
+    if (status === "TARGET HIT") return "#16a34a";
+    if (status === "STOP HIT") return "#dc2626";
+    if (status === "ACTIVE") return "#2563eb";
+    return "#64748b";
+  };
+
+  const formatNumber = (value, digits = 2) => {
+    if (value === null || value === undefined || value === "") return "-";
+    return Number(value).toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: digits,
+    });
+  };
+
+  const formatCurrency = (value, digits = 2) => {
+    if (value === null || value === undefined || value === "") return "-";
+    return `$${Number(value).toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: digits,
+    })}`;
+  };
+
+  const formatSignalTime = (value) => {
+    if (!value) return "-";
+    const numeric = Number(value);
+    if (!Number.isNaN(numeric) && `${numeric}`.length >= 10) {
+      return new Date(numeric).toLocaleString();
+    }
+    return String(value);
+  };
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/history`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch history.");
+      }
+      const result = await res.json();
+      setHistory(Array.isArray(result) ? result : []);
+    } catch (err) {
+      console.error("Error fetching history:", err);
+      setHistory([]);
+    }
+  }, []);
+
+  const fetchOverallPerformance = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/performance`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch overall performance.");
+      }
+      const result = await res.json();
+      setOverallPerformance(result);
+    } catch (err) {
+      console.error("Error fetching overall performance:", err);
+      setOverallPerformance(null);
+    }
+  }, []);
+
+  const fetchCoinPerformance = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/performance/${coin}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch ${coin} performance.`);
+      }
+      const result = await res.json();
+      setCoinPerformance(result);
+    } catch (err) {
+      console.error("Error fetching coin performance:", err);
+      setCoinPerformance(null);
+    }
+  }, [coin]);
+
   const fetchSignal = async () => {
     try {
-      setLoading(true);
+      setLoadingSignal(true);
       setError("");
 
       const response = await fetch(`${API_BASE_URL}/signal/${coin}`);
-
       if (!response.ok) {
-        throw new Error("Failed to fetch signal from backend.");
+        throw new Error("Failed to fetch latest signal.");
       }
 
       const result = await response.json();
       setData(result);
-      await fetchHistory();
-      await fetchPerformance();
 
-      
+      await Promise.all([
+        fetchHistory(),
+        fetchOverallPerformance(),
+        fetchCoinPerformance(),
+      ]);
     } catch (err) {
+      console.error("Fetch signal error:", err);
       setError(err.message || "Something went wrong.");
-      console.error("Fetch error:", err);
     } finally {
-      setLoading(false);
+      setLoadingSignal(false);
     }
   };
 
-  const clearHistory = () => {
-    alert("History is stored on server. Cannot clear from frontend.");
-  };
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoadingDashboard(true);
+        await Promise.all([
+          fetchHistory(),
+          fetchOverallPerformance(),
+          fetchCoinPerformance(),
+        ]);
+      } finally {
+        setLoadingDashboard(false);
+      }
+    };
 
-  const chartData =
-    data?.recent_prices?.map((price, index) => ({
-      index: index + 1,
-      price: Number(price),
-    })) || [];
+    loadDashboard();
+  }, [fetchHistory, fetchOverallPerformance, fetchCoinPerformance]);
+
+  const latestChartData = useMemo(() => {
+    return (
+      data?.recent_prices?.map((price, index) => ({
+        step: index + 1,
+        price: Number(price),
+      })) || []
+    );
+  }, [data]);
+
+  const overallEquityData = useMemo(() => {
+    return (overallPerformance?.equity_curve || []).map((value, index) => ({
+      step: index + 1,
+      equity: value,
+    }));
+  }, [overallPerformance]);
+
+  const coinEquityData = useMemo(() => {
+    return (coinPerformance?.equity_curve || []).map((value, index) => ({
+      step: index + 1,
+      equity: value,
+    }));
+  }, [coinPerformance]);
 
   const appStyle = {
     minHeight: "100vh",
@@ -114,7 +175,7 @@ function App() {
   };
 
   const containerStyle = {
-    maxWidth: "1100px",
+    maxWidth: "1200px",
     margin: "0 auto",
   };
 
@@ -171,16 +232,6 @@ function App() {
     fontSize: "14px",
   };
 
-  const secondaryButtonStyle = {
-    padding: "10px 14px",
-    borderRadius: "10px",
-    border: "1px solid #cbd5e1",
-    backgroundColor: "#ffffff",
-    cursor: "pointer",
-    fontWeight: "600",
-    color: "#334155",
-  };
-
   const panelStyle = {
     backgroundColor: "#ffffff",
     border: "1px solid #e2e8f0",
@@ -208,7 +259,7 @@ function App() {
 
   const signalGridStyle = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
     gap: "14px",
     marginTop: "16px",
   };
@@ -247,6 +298,32 @@ function App() {
     width: "100%",
     height: "320px",
     marginTop: "18px",
+  };
+
+  const kpiGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+    gap: "14px",
+  };
+
+  const darkCardStyle = {
+    background: "#111827",
+    borderRadius: "14px",
+    padding: "16px",
+    textAlign: "center",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+  };
+
+  const cardLabel = {
+    fontSize: "12px",
+    color: "#9ca3af",
+    marginBottom: "6px",
+  };
+
+  const cardValue = {
+    fontSize: "22px",
+    fontWeight: "700",
+    color: "#ffffff",
   };
 
   const historyGridStyle = {
@@ -300,7 +377,8 @@ function App() {
         <div style={headerStyle}>
           <h1 style={titleStyle}>AI Crypto Trading Dashboard</h1>
           <div style={subtitleStyle}>
-            Live signal view with chart and saved history
+            Production-ready crypto signal dashboard with live signals,
+            performance analytics, and recent trade history.
           </div>
         </div>
 
@@ -319,9 +397,9 @@ function App() {
             <button
               onClick={fetchSignal}
               style={primaryButtonStyle}
-              disabled={loading}
+              disabled={loadingSignal}
             >
-              {loading ? "Loading..." : "Get Signal"}
+              {loadingSignal ? "Loading..." : `Get ${coin} Signal`}
             </button>
           </div>
 
@@ -332,11 +410,86 @@ function App() {
           )}
         </div>
 
+        {overallPerformance && (
+          <div style={panelStyle}>
+            <div style={panelHeaderStyle}>
+              <h2 style={sectionTitleStyle}>Overall Strategy Performance</h2>
+              <span
+                style={{
+                  ...badgeBaseStyle,
+                  backgroundColor: "#0f172a",
+                }}
+              >
+                ALL COINS
+              </span>
+            </div>
+
+            <div style={kpiGridStyle}>
+              <div style={darkCardStyle}>
+                <div style={cardLabel}>Total Trades</div>
+                <div style={cardValue}>{overallPerformance.total_trades}</div>
+              </div>
+
+              <div style={darkCardStyle}>
+                <div style={cardLabel}>Wins</div>
+                <div style={{ ...cardValue, color: "#22c55e" }}>
+                  {overallPerformance.wins}
+                </div>
+              </div>
+
+              <div style={darkCardStyle}>
+                <div style={cardLabel}>Losses</div>
+                <div style={{ ...cardValue, color: "#ef4444" }}>
+                  {overallPerformance.losses}
+                </div>
+              </div>
+
+              <div style={darkCardStyle}>
+                <div style={cardLabel}>Win Rate</div>
+                <div style={{ ...cardValue, color: "#38bdf8" }}>
+                  {formatNumber(overallPerformance.win_rate)}%
+                </div>
+              </div>
+
+              <div style={darkCardStyle}>
+                <div style={cardLabel}>Profit %</div>
+                <div style={{ ...cardValue, color: "#22c55e" }}>
+                  {formatNumber(overallPerformance.total_profit_pct)}%
+                </div>
+              </div>
+
+              <div style={darkCardStyle}>
+                <div style={cardLabel}>Avg RR</div>
+                <div style={{ ...cardValue, color: "#a78bfa" }}>
+                  {formatNumber(overallPerformance.avg_rr)}
+                </div>
+              </div>
+            </div>
+
+            <div style={chartWrapperStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={overallEquityData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="step" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="equity"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         {data && (
           <div style={panelStyle}>
             <div style={panelHeaderStyle}>
               <h2 style={sectionTitleStyle}>Latest Signal</h2>
-
               <span
                 style={{
                   ...badgeBaseStyle,
@@ -360,30 +513,22 @@ function App() {
 
               <div style={statCardStyle}>
                 <div style={labelStyle}>Current Price</div>
-                <div style={valueStyle}>
-                  ${Number(data.current_price || 0).toLocaleString()}
-                </div>
+                <div style={valueStyle}>{formatCurrency(data.current_price, 4)}</div>
               </div>
 
               <div style={statCardStyle}>
                 <div style={labelStyle}>Entry</div>
-                <div style={valueStyle}>
-                  ${Number(data.entry || 0).toLocaleString()}
-                </div>
+                <div style={valueStyle}>{formatCurrency(data.entry, 4)}</div>
               </div>
 
               <div style={statCardStyle}>
                 <div style={labelStyle}>Stop</div>
-                <div style={valueStyle}>
-                  ${Number(data.stop || 0).toLocaleString()}
-                </div>
+                <div style={valueStyle}>{formatCurrency(data.stop, 4)}</div>
               </div>
 
               <div style={statCardStyle}>
                 <div style={labelStyle}>Target</div>
-                <div style={valueStyle}>
-                  ${Number(data.target || 0).toLocaleString()}
-                </div>
+                <div style={valueStyle}>{formatCurrency(data.target, 4)}</div>
               </div>
 
               <div style={statCardStyle}>
@@ -412,15 +557,14 @@ function App() {
             </div>
 
             <div style={{ ...mutedTextStyle, marginTop: "16px" }}>
-              <strong>Signal Time:</strong>{" "}
-              {data.signal_time ? new Date(data.signal_time).toLocaleString() : "-"}
+              <strong>Signal Time:</strong> {formatSignalTime(data.signal_time)}
             </div>
 
             <div style={chartWrapperStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
+                <LineChart data={latestChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="index" />
+                  <XAxis dataKey="step" />
                   <YAxis domain={["auto", "auto"]} />
                   <Tooltip />
                   <Line
@@ -435,99 +579,99 @@ function App() {
             </div>
           </div>
         )}
-        
-        {performance && (
-          <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                gap: "15px",
-                marginBottom: "20px",
-              }}
-            >
-              <div style={cardStyle}>
+
+        {coinPerformance && (
+          <div style={panelStyle}>
+            <div style={panelHeaderStyle}>
+              <h2 style={sectionTitleStyle}>Selected Coin Performance</h2>
+              <span
+                style={{
+                  ...badgeBaseStyle,
+                  backgroundColor: "#2563eb",
+                }}
+              >
+                {coinPerformance.coin || coin}
+              </span>
+            </div>
+
+            <div style={kpiGridStyle}>
+              <div style={darkCardStyle}>
                 <div style={cardLabel}>Total Trades</div>
-                <div style={cardValue}>{performance.total_trades}</div>
+                <div style={cardValue}>{coinPerformance.total_trades}</div>
               </div>
 
-              <div style={cardStyle}>
+              <div style={darkCardStyle}>
                 <div style={cardLabel}>Wins</div>
                 <div style={{ ...cardValue, color: "#22c55e" }}>
-                  {performance.wins}
+                  {coinPerformance.wins}
                 </div>
               </div>
 
-              <div style={cardStyle}>
+              <div style={darkCardStyle}>
                 <div style={cardLabel}>Losses</div>
                 <div style={{ ...cardValue, color: "#ef4444" }}>
-                  {performance.losses}
+                  {coinPerformance.losses}
                 </div>
               </div>
 
-              <div style={cardStyle}>
+              <div style={darkCardStyle}>
                 <div style={cardLabel}>Win Rate</div>
                 <div style={{ ...cardValue, color: "#38bdf8" }}>
-                  {performance.win_rate}%
+                  {formatNumber(coinPerformance.win_rate)}%
                 </div>
               </div>
 
-              <div style={cardStyle}>
+              <div style={darkCardStyle}>
                 <div style={cardLabel}>Profit %</div>
                 <div style={{ ...cardValue, color: "#22c55e" }}>
-                  {performance.total_profit_pct}%
+                  {formatNumber(coinPerformance.total_profit_pct)}%
                 </div>
               </div>
 
-              <div style={cardStyle}>
+              <div style={darkCardStyle}>
                 <div style={cardLabel}>Avg RR</div>
                 <div style={{ ...cardValue, color: "#a78bfa" }}>
-                  {performance.avg_rr}
+                  {formatNumber(coinPerformance.avg_rr)}
                 </div>
               </div>
             </div>
 
-            <div style={panelStyle}>
-              <div style={panelHeaderStyle}>
-                <h2 style={sectionTitleStyle}>Equity Curve</h2>
-              </div>
-
-              <div style={{ width: "100%", height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={(performance.equity_curve || []).map((value, index) => ({
-                      step: index + 1,
-                      equity: value,
-                    }))}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="step" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="equity"
-                      stroke="#22c55e"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+            <div style={chartWrapperStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={coinEquityData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="step" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="equity"
+                    stroke="#2563eb"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-          </>
+          </div>
         )}
 
         <div style={panelStyle}>
           <div style={panelHeaderStyle}>
-            <h2 style={sectionTitleStyle}>Signal History</h2>
-
-            <button onClick={clearHistory} style={secondaryButtonStyle}>
-              Clear History
-            </button>
+            <h2 style={sectionTitleStyle}>Recent Signal History</h2>
+            <span
+              style={{
+                ...badgeBaseStyle,
+                backgroundColor: "#0f172a",
+              }}
+            >
+              ALL COINS
+            </span>
           </div>
 
-          {history.length === 0 ? (
+          {loadingDashboard ? (
+            <p style={emptyTextStyle}>Loading dashboard data...</p>
+          ) : history.length === 0 ? (
             <p style={emptyTextStyle}>No signals saved yet.</p>
           ) : (
             <div style={historyGridStyle}>
@@ -538,46 +682,52 @@ function App() {
                       {item.requested_coin} → {item.coin_used}
                     </div>
 
-                    <span
-                      style={{
-                        ...badgeBaseStyle,
-                        backgroundColor: getSignalColor(item.signal),
-                      }}
-                    >
-                      {item.signal}
-                    </span>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <span
+                        style={{
+                          ...badgeBaseStyle,
+                          backgroundColor: getSignalColor(item.signal),
+                        }}
+                      >
+                        {item.signal}
+                      </span>
+
+                      <span
+                        style={{
+                          ...badgeBaseStyle,
+                          backgroundColor: getStatusColor(item.status),
+                        }}
+                      >
+                        {item.status}
+                      </span>
+                    </div>
                   </div>
 
                   <div style={historyRowStyle}>
-                    <strong>Current Price:</strong> $
-                    {Number(item.current_price || 0).toLocaleString()}
+                    <strong>Current Price:</strong> {formatCurrency(item.current_price, 4)}
                   </div>
 
                   <div style={historyRowStyle}>
-                    <strong>Entry:</strong> $
-                    {Number(item.entry || 0).toLocaleString()} |{" "}
-                    <strong>Stop:</strong> $
-                    {Number(item.stop || 0).toLocaleString()} |{" "}
-                    <strong>Target:</strong> $
-                    {Number(item.target || 0).toLocaleString()}
+                    <strong>Entry:</strong> {formatCurrency(item.entry, 4)} |{" "}
+                    <strong>Stop:</strong> {formatCurrency(item.stop, 4)} |{" "}
+                    <strong>Target:</strong> {formatCurrency(item.target, 4)}
                   </div>
 
                   <div style={historyRowStyle}>
-                    <strong>Status:</strong> {item.status} |{" "}
-                    <strong>Confidence:</strong> {item.confidence}
+                    <strong>Confidence:</strong> {item.confidence || "-"} |{" "}
+                    <strong>Interval:</strong> {item.interval || "-"}
                   </div>
-                  
+
                   <div style={historyRowStyle}>
-                    <strong>Interval:</strong> {item.interval || "-"} |{" "}
                     <strong>Candles Ago:</strong>{" "}
                     {item.candles_ago !== null && item.candles_ago !== undefined
                       ? item.candles_ago
-                      : "-"}
+                      : "-"}{" "}
+                    | <strong>RR:</strong> {formatNumber(item.rr)}
                   </div>
-                  
+
                   <div style={mutedTextStyle}>
-                    <strong>Signal Time:</strong>{" "}
-                    {item.signal_time ? new Date(item.signal_time).toLocaleString() : "-"}
+                    <strong>Signal Time:</strong> {formatSignalTime(item.signal_time)}
                   </div>
 
                   <div style={{ ...mutedTextStyle, color: "#94a3b8" }}>

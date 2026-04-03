@@ -46,21 +46,24 @@ def get_history(coin: str):
 
     return [dict(row) for row in rows]
 
-@router.get("/performance/{coin}")
-def get_performance(coin: str):
+@router.get("/history")
+def get_history_all():
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT *
         FROM signal_history
-        WHERE coin_used = ?
-        ORDER BY id ASC
-    """, (coin.upper(),))
+        ORDER BY id DESC
+        LIMIT 50
+    """)
 
     rows = cursor.fetchall()
     conn.close()
 
+    return [dict(row) for row in rows]
+
+def calculate_performance(rows, coin_label="ALL"):
     closed_trades = [
         row for row in rows
         if row["status"] in ["TARGET HIT", "STOP HIT"]
@@ -112,7 +115,7 @@ def get_performance(coin: str):
     avg_rr = sum(rr_values) / len(rr_values) if rr_values else 0
 
     return {
-        "coin": coin.upper(),
+        "coin": coin_label,
         "total_trades": total,
         "wins": wins,
         "losses": losses,
@@ -121,3 +124,38 @@ def get_performance(coin: str):
         "equity_curve": equity_curve,
         "avg_rr": round(avg_rr, 2),
     }
+
+
+@router.get("/performance")
+def get_overall_performance():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM signal_history
+        ORDER BY id ASC
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return calculate_performance(rows, coin_label="ALL")
+
+
+@router.get("/performance/{coin}")
+def get_performance(coin: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM signal_history
+        WHERE coin_used = ?
+        ORDER BY id ASC
+    """, (coin.upper(),))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return calculate_performance(rows, coin_label=coin.upper())
