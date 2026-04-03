@@ -51,17 +51,26 @@ def get_performance(coin: str):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM signal_history WHERE coin_used = ? ORDER BY id ASC")
+    cursor.execute("""
+        SELECT *
+        FROM signal_history
+        WHERE coin_used = ?
+        ORDER BY id ASC
+    """, (coin.upper(),))
+
     rows = cursor.fetchall()
     conn.close()
 
-    closed_trades = [row for row in rows if row["status"] in ["TARGET HIT", "STOP HIT"]]
+    closed_trades = [
+        row for row in rows
+        if row["status"] in ["TARGET HIT", "STOP HIT"]
+    ]
 
     total = len(closed_trades)
     wins = 0
     losses = 0
 
-    equity = 100  # start with 100 units
+    equity = 100.0
     equity_curve = []
     rr_values = []
 
@@ -70,40 +79,40 @@ def get_performance(coin: str):
         target = row["target"]
         stop = row["stop"]
         signal = row["signal"]
+        status = row["status"]
+        rr = row["rr"]
 
-        if not entry or not target or not stop:
+        if entry is None or target is None or stop is None or signal is None:
             continue
-        
-        if row["rr"]:
-            rr_values.append(row["rr"])
 
+        if rr is not None:
+            rr_values.append(rr)
 
-        if row["status"] == "TARGET HIT":
+        profit_pct = 0.0
+
+        if status == "TARGET HIT":
             wins += 1
-
             if signal == "BUY":
                 profit_pct = (target - entry) / entry
-            else:  # SELL
+            elif signal == "SELL":
                 profit_pct = (entry - target) / entry
 
-        elif row["status"] == "STOP HIT":
+        elif status == "STOP HIT":
             losses += 1
-
             if signal == "BUY":
                 profit_pct = (stop - entry) / entry
-            else:  # SELL
+            elif signal == "SELL":
                 profit_pct = (entry - stop) / entry
 
         equity = equity * (1 + profit_pct)
         equity_curve.append(round(equity, 2))
 
     win_rate = (wins / total * 100) if total > 0 else 0
-
     total_profit = equity - 100
-
     avg_rr = sum(rr_values) / len(rr_values) if rr_values else 0
 
     return {
+        "coin": coin.upper(),
         "total_trades": total,
         "wins": wins,
         "losses": losses,
@@ -112,4 +121,3 @@ def get_performance(coin: str):
         "equity_curve": equity_curve,
         "avg_rr": round(avg_rr, 2),
     }
-
