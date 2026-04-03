@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -19,11 +19,7 @@ function App() {
   const [error, setError] = useState("");
   const [performance, setPerformance] = useState(null);
 
-  useEffect(() => {
-  fetchHistory();
-  fetchPerformance();
-  }, [coin]);
-
+  
   const cardStyle = {
     background: "#111827",
     borderRadius: "12px",
@@ -44,7 +40,7 @@ function App() {
     color: "#fff"
   };
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/history/${coin}`);
       const data = await res.json();
@@ -52,9 +48,9 @@ function App() {
     } catch (err) {
       console.error("Error fetching history:", err);
     }
-  };
+  }, [coin]);
 
-  const fetchPerformance = async () => {
+  const fetchPerformance = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/performance/${coin}`);
       const data = await res.json();
@@ -62,8 +58,13 @@ function App() {
     } catch (err) {
       console.error("Error fetching performance:", err);
     }
-  };
-
+  }, [coin]);
+  
+  useEffect(() => {
+    fetchHistory();
+    fetchPerformance();
+  }, [fetchHistory, fetchPerformance]);
+  
   const getSignalColor = (signal) => {
     if (signal === "BUY") return "#16a34a";
     if (signal === "SELL") return "#dc2626";
