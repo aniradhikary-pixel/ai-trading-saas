@@ -3,11 +3,38 @@ from datetime import datetime
 from services.signal_service import (
     generate_trading_signal, 
     save_signal_to_db,
-    send_telegram_alert
-)
+    send_telegram_alert_to_user,
+    broadcast_signal
+    )
 from database import get_connection
+from fastapi import Request
+from services.signal_service import add_subscriber, send_welcome_message
+
 
 router = APIRouter()
+
+@router.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    data = await request.json()
+
+    message = data.get("message", {})
+    chat = message.get("chat", {})
+    text = message.get("text", "")
+
+    chat_id = chat.get("id")
+    username = chat.get("username")
+
+    full_name = " ".join(filter(None, [
+        chat.get("first_name"),
+        chat.get("last_name")
+    ]))
+
+    # 👉 When user starts bot
+    if text == "/start" and chat_id:
+        add_subscriber(chat_id, username, full_name)
+        send_welcome_message(chat_id)
+
+    return {"ok": True}
 
 @router.get("/signal/{coin}")
 def get_signal(coin: str):
@@ -21,12 +48,27 @@ def get_signal(coin: str):
     }
 
     if "error" not in final_result:
-        is_new_trade = save_signal_to_db(final_result)
-
-        if is_new_trade:
-            send_telegram_alert(final_result)
+        save_signal_to_db(final_result)
 
     return final_result
+
+@router.get("/latest-signal/{coin}")
+def get_latest_signal(coin: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM signal_history
+        WHERE coin_used = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """, (coin.upper(),))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return dict(row) if row else {}
 
 @router.get("/history/{coin}")
 def get_history(coin: str):
