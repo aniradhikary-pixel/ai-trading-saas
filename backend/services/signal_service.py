@@ -156,24 +156,28 @@ def send_telegram_alert_to_user(chat_id, signal_data: dict):
             readable_time = "N/A"
 
         message = f"""
-🚨 New Trade Signal
+🚨 *New Trade Signal*
 
-Coin: {signal_data.get("coin_used")}
-Signal: {signal_data.get("signal")}
-Interval: {signal_data.get("interval")}
-Entry: {signal_data.get("entry")}
-Stop: {signal_data.get("stop")}
-Target: {signal_data.get("target")}
-Status: {signal_data.get("status")}
-Confidence: {signal_data.get("confidence")}
-Signal Time: {readable_time}
+📊 Coin: {signal_data.get("coin_used")}
+📈 Signal: *{signal_data.get("signal")}*
+⏱ Interval: {signal_data.get("interval")}
+
+💰 Entry: {signal_data.get("entry")}
+🛑 Stop: {signal_data.get("stop")}
+🎯 Target: {signal_data.get("target")}
+
+📊 Status: {signal_data.get("status")}
+⚡ Confidence: {signal_data.get("confidence")}
+
+🕒 Time: {readable_time}
 """
 
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
         payload = {
             "chat_id": chat_id,
-            "text": message
+            "text": message,
+            "parse_mode": "Markdown"
         }
 
         response = requests.post(url, data=payload, timeout=10)

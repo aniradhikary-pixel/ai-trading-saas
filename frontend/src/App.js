@@ -106,7 +106,7 @@ function App() {
       setLoadingSignal(true);
       setError("");
 
-      const response = await fetch(`${API_BASE_URL}/signal/${coin}`);
+      const response = await fetch(`${API_BASE_URL}/latest-signal/${coin}`);
       if (!response.ok) {
         throw new Error("Failed to fetch latest signal.");
       }

@@ -16,6 +16,7 @@ router = APIRouter()
 @router.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
     data = await request.json()
+    print("Webhook hit:", data)
 
     message = data.get("message", {})
     chat = message.get("chat", {})
@@ -29,8 +30,7 @@ async def telegram_webhook(request: Request):
         chat.get("last_name")
     ]))
 
-    # 👉 When user starts bot
-    if text == "/start" and chat_id:
+    if text and text.startswith("/start") and chat_id:
         add_subscriber(chat_id, username, full_name)
         send_welcome_message(chat_id)
 
