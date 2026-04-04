@@ -53,5 +53,16 @@ def init_db():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            plan_interest TEXT DEFAULT 'free',
+            source TEXT DEFAULT 'website',
+            created_at TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()

@@ -3,15 +3,42 @@ from datetime import datetime
 from services.signal_service import (
     generate_trading_signal, 
     save_signal_to_db,
-    send_telegram_alert_to_user,
-    broadcast_signal
+    add_subscriber,
+    send_welcome_message,
     )
 from database import get_connection
 from fastapi import Request
 from services.signal_service import add_subscriber, send_welcome_message
-
+from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
+
+class LeadRequest(BaseModel):
+    full_name: str
+    email: EmailStr
+
+@router.post("/subscribe")
+def subscribe_lead(payload: LeadRequest):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO leads (
+            full_name, email, plan_interest, source, created_at
+        )
+        VALUES (?, ?, 'free', 'website', datetime('now'))
+    """, (
+        payload.full_name,
+        payload.email,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "message": "Lead captured successfully",
+        "telegram_bot_url": "https://t.me/AICryptoTradingSignal_bot?start=free"
+    }
 
 @router.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
@@ -32,6 +59,20 @@ async def telegram_webhook(request: Request):
 
     if text and text.startswith("/start") and chat_id:
         add_subscriber(chat_id, username, full_name)
+
+        if username:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE leads
+                SET source = 'telegram_joined'
+                WHERE LOWER(telegram_username) = LOWER(?)
+            """, (username,))
+
+            conn.commit()
+            conn.close()
+
         send_welcome_message(chat_id)
 
     return {"ok": True}
@@ -201,3 +242,29 @@ def get_performance(coin: str):
     conn.close()
 
     return calculate_performance(rows, coin_label=coin.upper())
+@router.get("/analytics")
+def get_analytics():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) as count FROM leads")
+    leads = cursor.fetchone()["count"]
+
+    cursor.execute("SELECT COUNT(*) as count FROM subscribers")
+    subscribers = cursor.fetchone()["count"]
+
+    cursor.execute("SELECT COUNT(*) as count FROM subscribers WHERE plan = 'pro'")
+    pro_users = cursor.fetchone()["count"]
+
+    conn.close()
+
+    conversion_rate = (subscribers / leads * 100) if leads > 0 else 0
+    revenue = pro_users * 19
+
+    return {
+        "leads": leads,
+        "subscribers": subscribers,
+        "conversion_rate": round(conversion_rate, 2),
+        "pro_users": pro_users,
+        "revenue": revenue
+    }

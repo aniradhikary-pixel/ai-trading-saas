@@ -21,6 +21,56 @@ function App() {
   const [coinPerformance, setCoinPerformance] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [error, setError] = useState("");
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [leadName, setLeadName] = useState("");
+  const [leadEmail, setLeadEmail] = useState("");
+  const [submittingLead, setSubmittingLead] = useState(false);
+  const [leadMessage, setLeadMessage] = useState("");
+
+  const handleSubscribeFree = async (e) => {
+    e.preventDefault();
+
+    if (!leadName.trim() || !leadEmail.trim()) {
+      setLeadMessage("Please enter your name and email.");
+      return;
+    }
+
+    try {
+      setSubmittingLead(true);
+      setLeadMessage("");
+
+      const res = await fetch(`${API_BASE_URL}/subscribe`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: leadName,
+          email: leadEmail,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to save your details.");
+      }
+
+      const data = await res.json();
+
+      setLeadMessage("Details saved. Redirecting to Telegram...");
+
+      setTimeout(() => {
+        window.open(data.telegram_bot_url, "_blank");
+        setShowSubscribeModal(false);
+        setLeadName("");
+        setLeadEmail("");
+        setLeadMessage("");
+      }, 1200);
+    } catch (err) {
+      setLeadMessage(err.message || "Something went wrong.");
+    } finally {
+      setSubmittingLead(false);
+    }
+  };
 
   const getSignalColor = (signal) => {
     if (signal === "BUY") return "#16a34a";
@@ -449,14 +499,16 @@ function App() {
               </div>
 
               <div style={ctaRowStyle}>
-                <a
-                  href={TELEGRAM_BOT_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={secondaryCtaStyle}
+                <button
+                  onClick={() => setShowSubscribeModal(true)}
+                  style={{
+                    ...secondaryCtaStyle,
+                    border: "none",
+                    cursor: "pointer",
+                  }}
                 >
                   Subscribe Free
-                </a>
+                </button>
                 <a
                   href={TELEGRAM_CONTACT_URL}
                   target="_blank"
@@ -920,6 +972,117 @@ function App() {
           </div>
         </div>
       </div>
+      {showSubscribeModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "16px",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "460px",
+              backgroundColor: "#ffffff",
+              borderRadius: "18px",
+              padding: "24px",
+              boxShadow: "0 20px 60px rgba(15, 23, 42, 0.28)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h2 style={{ margin: 0, color: "#0f172a", fontSize: "22px" }}>Join Free Plan</h2>
+              <button
+                onClick={() => setShowSubscribeModal(false)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  fontSize: "22px",
+                  cursor: "pointer",
+                  color: "#64748b",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <p style={{ color: "#475569", marginTop: 0, lineHeight: 1.6 }}>
+              Enter your details to join the free plan, then continue to our Telegram bot.
+            </p>
+
+            <form onSubmit={handleSubscribeFree}>
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", marginBottom: "6px", color: "#334155", fontWeight: "600" }}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={leadName}
+                  onChange={(e) => setLeadName(e.target.value)}
+                  placeholder="Enter your full name"
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", marginBottom: "6px", color: "#334155", fontWeight: "600" }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={leadEmail}
+                  onChange={(e) => setLeadEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              {leadMessage && (
+                <p style={{ color: leadMessage.includes("Redirecting") ? "#16a34a" : "#dc2626", marginBottom: "12px" }}>
+                  {leadMessage}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submittingLead}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: "10px",
+                  border: "none",
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  fontSize: "15px",
+                }}
+              >
+                {submittingLead ? "Saving..." : "Submit & Join Telegram"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
