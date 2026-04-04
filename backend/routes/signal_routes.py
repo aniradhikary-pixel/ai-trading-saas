@@ -1,15 +1,14 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from datetime import datetime
+from pydantic import BaseModel, EmailStr
+
 from services.signal_service import (
-    generate_trading_signal, 
+    generate_trading_signal,
     save_signal_to_db,
     add_subscriber,
     send_welcome_message,
-    )
+)
 from database import get_connection
-from fastapi import Request
-from services.signal_service import add_subscriber, send_welcome_message
-from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
 
@@ -59,20 +58,6 @@ async def telegram_webhook(request: Request):
 
     if text and text.startswith("/start") and chat_id:
         add_subscriber(chat_id, username, full_name)
-
-        if username:
-            conn = get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                UPDATE leads
-                SET source = 'telegram_joined'
-                WHERE LOWER(telegram_username) = LOWER(?)
-            """, (username,))
-
-            conn.commit()
-            conn.close()
-
         send_welcome_message(chat_id)
 
     return {"ok": True}
@@ -242,6 +227,7 @@ def get_performance(coin: str):
     conn.close()
 
     return calculate_performance(rows, coin_label=coin.upper())
+
 @router.get("/analytics")
 def get_analytics():
     conn = get_connection()

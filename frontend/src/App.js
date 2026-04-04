@@ -10,7 +10,7 @@ import {
 } from "recharts";
 
 const API_BASE_URL = "https://ai-trading-saas-production.up.railway.app";
-const TELEGRAM_BOT_URL = "https://t.me/AICryptoTradingSignal_bot";
+const TELEGRAM_BOT_URL = "https://t.me/AICryptoTradingSignal_bot?start=free";
 const TELEGRAM_CONTACT_URL = "https://t.me/Anir3103";
 
 function App() {
@@ -19,58 +19,15 @@ function App() {
   const [history, setHistory] = useState([]);
   const [overallPerformance, setOverallPerformance] = useState(null);
   const [coinPerformance, setCoinPerformance] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [error, setError] = useState("");
+
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [leadName, setLeadName] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
   const [submittingLead, setSubmittingLead] = useState(false);
   const [leadMessage, setLeadMessage] = useState("");
-
-  const handleSubscribeFree = async (e) => {
-    e.preventDefault();
-
-    if (!leadName.trim() || !leadEmail.trim()) {
-      setLeadMessage("Please enter your name and email.");
-      return;
-    }
-
-    try {
-      setSubmittingLead(true);
-      setLeadMessage("");
-
-      const res = await fetch(`${API_BASE_URL}/subscribe`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          full_name: leadName,
-          email: leadEmail,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to save your details.");
-      }
-
-      const data = await res.json();
-
-      setLeadMessage("Details saved. Redirecting to Telegram...");
-
-      setTimeout(() => {
-        window.open(data.telegram_bot_url, "_blank");
-        setShowSubscribeModal(false);
-        setLeadName("");
-        setLeadEmail("");
-        setLeadMessage("");
-      }, 1200);
-    } catch (err) {
-      setLeadMessage(err.message || "Something went wrong.");
-    } finally {
-      setSubmittingLead(false);
-    }
-  };
 
   const getSignalColor = (signal) => {
     if (signal === "BUY") return "#16a34a";
@@ -110,12 +67,60 @@ function App() {
     return String(value);
   };
 
+  const openSubscribeModal = () => {
+    setLeadMessage("");
+    setShowSubscribeModal(true);
+  };
+
+  const handleSubscribeFree = async (e) => {
+    e.preventDefault();
+
+    if (!leadName.trim() || !leadEmail.trim()) {
+      setLeadMessage("Please enter your name and email.");
+      return;
+    }
+
+    try {
+      setSubmittingLead(true);
+      setLeadMessage("");
+
+      const res = await fetch(`${API_BASE_URL}/subscribe`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: leadName,
+          email: leadEmail,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to save your details.");
+      }
+
+      const data = await res.json();
+
+      setLeadMessage("Details saved. Redirecting to Telegram...");
+
+      setTimeout(() => {
+        window.open(data.telegram_bot_url || TELEGRAM_BOT_URL, "_blank");
+        setShowSubscribeModal(false);
+        setLeadName("");
+        setLeadEmail("");
+        setLeadMessage("");
+      }, 1200);
+    } catch (err) {
+      setLeadMessage(err.message || "Something went wrong.");
+    } finally {
+      setSubmittingLead(false);
+    }
+  };
+
   const fetchLatestSignal = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/latest-signal/${coin}`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch latest ${coin} signal.`);
-      }
+      if (!res.ok) throw new Error(`Failed to fetch latest ${coin} signal.`);
       const result = await res.json();
       setLatestSignal(result && Object.keys(result).length ? result : null);
     } catch (err) {
@@ -127,9 +132,7 @@ function App() {
   const fetchHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/history`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch history.");
-      }
+      if (!res.ok) throw new Error("Failed to fetch history.");
       const result = await res.json();
       setHistory(Array.isArray(result) ? result : []);
     } catch (err) {
@@ -141,9 +144,7 @@ function App() {
   const fetchOverallPerformance = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/performance`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch overall performance.");
-      }
+      if (!res.ok) throw new Error("Failed to fetch overall performance.");
       const result = await res.json();
       setOverallPerformance(result);
     } catch (err) {
@@ -155,9 +156,7 @@ function App() {
   const fetchCoinPerformance = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/performance/${coin}`);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch ${coin} performance.`);
-      }
+      if (!res.ok) throw new Error(`Failed to fetch ${coin} performance.`);
       const result = await res.json();
       setCoinPerformance(result);
     } catch (err) {
@@ -165,6 +164,18 @@ function App() {
       setCoinPerformance(null);
     }
   }, [coin]);
+
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/analytics`);
+      if (!res.ok) throw new Error("Failed to fetch analytics.");
+      const result = await res.json();
+      setAnalytics(result);
+    } catch (err) {
+      console.error("Error fetching analytics:", err);
+      setAnalytics(null);
+    }
+  }, []);
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -174,6 +185,7 @@ function App() {
         fetchHistory(),
         fetchOverallPerformance(),
         fetchCoinPerformance(),
+        fetchAnalytics(),
       ]);
     } catch (err) {
       setError("Failed to load dashboard data.");
@@ -183,6 +195,7 @@ function App() {
     fetchHistory,
     fetchOverallPerformance,
     fetchCoinPerformance,
+    fetchAnalytics,
   ]);
 
   useEffect(() => {
@@ -223,6 +236,19 @@ function App() {
       equity: value,
     }));
   }, [coinPerformance]);
+
+  const monthlyCallCount = useMemo(() => {
+    const now = new Date();
+    return history.filter((item) => {
+      if (!item.fetched_at) return false;
+      const d = new Date(item.fetched_at);
+      return (
+        !Number.isNaN(d.getTime()) &&
+        d.getMonth() === now.getMonth() &&
+        d.getFullYear() === now.getFullYear()
+      );
+    }).length;
+  }, [history]);
 
   const appStyle = {
     minHeight: "100vh",
@@ -393,12 +419,25 @@ function App() {
     gap: "14px",
   };
 
+  const founderGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "14px",
+  };
+
   const darkCardStyle = {
     background: "#111827",
     borderRadius: "14px",
     padding: "16px",
     textAlign: "center",
     boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+  };
+
+  const founderCardStyle = {
+    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+    borderRadius: "14px",
+    padding: "18px",
+    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.18)",
   };
 
   const cardLabel = {
@@ -409,6 +448,18 @@ function App() {
 
   const cardValue = {
     fontSize: "22px",
+    fontWeight: "700",
+    color: "#ffffff",
+  };
+
+  const founderLabel = {
+    fontSize: "12px",
+    color: "#cbd5e1",
+    marginBottom: "6px",
+  };
+
+  const founderValue = {
+    fontSize: "24px",
     fontWeight: "700",
     color: "#ffffff",
   };
@@ -495,12 +546,12 @@ function App() {
               <h1 style={heroTitleStyle}>AI Crypto Trading Dashboard</h1>
               <div style={heroSubtitleStyle}>
                 Real-time crypto signal delivery platform with Telegram alerts,
-                performance analytics, signal history, and premium upgrade flow.
+                performance analytics, signal history, founder metrics, and premium upgrade flow.
               </div>
 
               <div style={ctaRowStyle}>
                 <button
-                  onClick={() => setShowSubscribeModal(true)}
+                  onClick={openSubscribeModal}
                   style={{
                     ...secondaryCtaStyle,
                     border: "none",
@@ -517,6 +568,67 @@ function App() {
                 >
                   Upgrade to Pro
                 </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={panelStyle}>
+          <div style={panelHeaderStyle}>
+            <h2 style={sectionTitleStyle}>Founder Analytics Dashboard</h2>
+            <span
+              style={{
+                ...badgeStyle,
+                backgroundColor: "#0f172a",
+                color: "#ffffff",
+              }}
+            >
+              BUSINESS OVERVIEW
+            </span>
+          </div>
+
+          <div style={founderGridStyle}>
+            <div style={founderCardStyle}>
+              <div style={founderLabel}>Total Leads</div>
+              <div style={founderValue}>{formatNumber(analytics?.leads || 0)}</div>
+            </div>
+
+            <div style={founderCardStyle}>
+              <div style={founderLabel}>Telegram Subscribers</div>
+              <div style={founderValue}>{formatNumber(analytics?.subscribers || 0)}</div>
+            </div>
+
+            <div style={founderCardStyle}>
+              <div style={founderLabel}>Conversion Rate</div>
+              <div style={founderValue}>{formatNumber(analytics?.conversion_rate || 0)}%</div>
+            </div>
+
+            <div style={founderCardStyle}>
+              <div style={founderLabel}>PRO Users</div>
+              <div style={founderValue}>{formatNumber(analytics?.pro_users || 0)}</div>
+            </div>
+
+            <div style={founderCardStyle}>
+              <div style={founderLabel}>Revenue Potential</div>
+              <div style={founderValue}>{formatCurrency(analytics?.revenue || 0)}</div>
+            </div>
+
+            <div style={founderCardStyle}>
+              <div style={founderLabel}>Monthly Call Count</div>
+              <div style={founderValue}>{formatNumber(monthlyCallCount)}</div>
+            </div>
+
+            <div style={founderCardStyle}>
+              <div style={founderLabel}>Overall Return</div>
+              <div style={founderValue}>
+                {formatNumber(overallPerformance?.total_profit_pct || 0)}%
+              </div>
+            </div>
+
+            <div style={founderCardStyle}>
+              <div style={founderLabel}>Total Closed Trades</div>
+              <div style={founderValue}>
+                {formatNumber(overallPerformance?.total_trades || 0)}
               </div>
             </div>
           </div>
@@ -928,14 +1040,17 @@ function App() {
                 ✔ Basic strategy signals<br />
                 ✔ Limited alert coverage
               </div>
-              <a
-                href={TELEGRAM_BOT_URL}
-                target="_blank"
-                rel="noreferrer"
-                style={{ ...primaryCtaStyle, marginTop: "16px" }}
+              <button
+                onClick={openSubscribeModal}
+                style={{
+                  ...primaryCtaStyle,
+                  marginTop: "16px",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
                 Join Free
-              </a>
+              </button>
             </div>
 
             <div style={proCardStyle}>
@@ -972,6 +1087,7 @@ function App() {
           </div>
         </div>
       </div>
+
       {showSubscribeModal && (
         <div
           style={{
