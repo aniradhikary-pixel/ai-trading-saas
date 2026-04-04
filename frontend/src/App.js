@@ -10,14 +10,15 @@ import {
 } from "recharts";
 
 const API_BASE_URL = "https://ai-trading-saas-production.up.railway.app";
+const TELEGRAM_BOT_URL = "https://t.me/@AICryptoTradingSignal_bot";
+const TELEGRAM_CONTACT_URL = "https://t.me/@Anir3103";
 
 function App() {
   const [coin, setCoin] = useState("BTC");
-  const [data, setData] = useState(null);
+  const [latestSignal, setLatestSignal] = useState(null);
   const [history, setHistory] = useState([]);
   const [overallPerformance, setOverallPerformance] = useState(null);
   const [coinPerformance, setCoinPerformance] = useState(null);
-  const [loadingSignal, setLoadingSignal] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [error, setError] = useState("");
 
@@ -58,6 +59,20 @@ function App() {
     }
     return String(value);
   };
+
+  const fetchLatestSignal = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/latest-signal/${coin}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch latest ${coin} signal.`);
+      }
+      const result = await res.json();
+      setLatestSignal(result && Object.keys(result).length ? result : null);
+    } catch (err) {
+      console.error("Error fetching latest signal:", err);
+      setLatestSignal(null);
+    }
+  }, [coin]);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -101,57 +116,49 @@ function App() {
     }
   }, [coin]);
 
-  const fetchSignal = async () => {
+  const loadDashboard = useCallback(async () => {
     try {
-      setLoadingSignal(true);
       setError("");
-
-      const response = await fetch(`${API_BASE_URL}/latest-signal/${coin}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch latest signal.");
-      }
-
-      const result = await response.json();
-      setData(result);
-
       await Promise.all([
+        fetchLatestSignal(),
         fetchHistory(),
         fetchOverallPerformance(),
         fetchCoinPerformance(),
       ]);
     } catch (err) {
-      console.error("Fetch signal error:", err);
-      setError(err.message || "Something went wrong.");
-    } finally {
-      setLoadingSignal(false);
+      setError("Failed to load dashboard data.");
     }
-  };
+  }, [
+    fetchLatestSignal,
+    fetchHistory,
+    fetchOverallPerformance,
+    fetchCoinPerformance,
+  ]);
 
   useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoadingDashboard(true);
-        await Promise.all([
-          fetchHistory(),
-          fetchOverallPerformance(),
-          fetchCoinPerformance(),
-        ]);
-      } finally {
-        setLoadingDashboard(false);
-      }
+    const init = async () => {
+      setLoadingDashboard(true);
+      await loadDashboard();
+      setLoadingDashboard(false);
     };
 
-    loadDashboard();
-  }, [fetchHistory, fetchOverallPerformance, fetchCoinPerformance]);
+    init();
+
+    const interval = setInterval(() => {
+      loadDashboard();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [loadDashboard]);
 
   const latestChartData = useMemo(() => {
     return (
-      data?.recent_prices?.map((price, index) => ({
+      latestSignal?.recent_prices?.map((price, index) => ({
         step: index + 1,
         price: Number(price),
       })) || []
     );
-  }, [data]);
+  }, [latestSignal]);
 
   const overallEquityData = useMemo(() => {
     return (overallPerformance?.equity_curve || []).map((value, index) => ({
@@ -179,21 +186,71 @@ function App() {
     margin: "0 auto",
   };
 
-  const headerStyle = {
+  const heroStyle = {
+    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+    borderRadius: "20px",
+    padding: "28px",
+    color: "#ffffff",
     marginBottom: "24px",
+    boxShadow: "0 10px 30px rgba(15, 23, 42, 0.22)",
   };
 
-  const titleStyle = {
+  const heroTopStyle = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "16px",
+    flexWrap: "wrap",
+  };
+
+  const heroTitleStyle = {
     margin: 0,
-    fontSize: "32px",
+    fontSize: "34px",
     fontWeight: "700",
-    color: "#0f172a",
   };
 
-  const subtitleStyle = {
-    marginTop: "8px",
-    color: "#475569",
+  const heroSubtitleStyle = {
+    marginTop: "10px",
+    color: "#cbd5e1",
     fontSize: "15px",
+    maxWidth: "720px",
+    lineHeight: 1.6,
+  };
+
+  const badgeStyle = {
+    display: "inline-block",
+    padding: "6px 12px",
+    borderRadius: "999px",
+    fontSize: "12px",
+    fontWeight: "700",
+    letterSpacing: "0.3px",
+  };
+
+  const ctaRowStyle = {
+    display: "flex",
+    gap: "12px",
+    flexWrap: "wrap",
+    marginTop: "18px",
+  };
+
+  const primaryCtaStyle = {
+    display: "inline-block",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    backgroundColor: "#2563eb",
+    color: "#ffffff",
+    fontWeight: "700",
+    textDecoration: "none",
+  };
+
+  const secondaryCtaStyle = {
+    display: "inline-block",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    backgroundColor: "#ffffff",
+    color: "#0f172a",
+    fontWeight: "700",
+    textDecoration: "none",
   };
 
   const controlPanelStyle = {
@@ -210,6 +267,7 @@ function App() {
     gap: "12px",
     flexWrap: "wrap",
     alignItems: "center",
+    justifyContent: "space-between",
   };
 
   const selectStyle = {
@@ -219,17 +277,6 @@ function App() {
     fontSize: "14px",
     minWidth: "140px",
     backgroundColor: "#ffffff",
-  };
-
-  const primaryButtonStyle = {
-    padding: "12px 18px",
-    borderRadius: "10px",
-    border: "none",
-    backgroundColor: "#2563eb",
-    color: "#ffffff",
-    fontWeight: "700",
-    cursor: "pointer",
-    fontSize: "14px",
   };
 
   const panelStyle = {
@@ -282,16 +329,6 @@ function App() {
     fontSize: "18px",
     color: "#0f172a",
     fontWeight: "700",
-  };
-
-  const badgeBaseStyle = {
-    color: "#ffffff",
-    padding: "6px 12px",
-    borderRadius: "999px",
-    fontSize: "12px",
-    fontWeight: "700",
-    letterSpacing: "0.3px",
-    display: "inline-block",
   };
 
   const chartWrapperStyle = {
@@ -371,36 +408,88 @@ function App() {
     margin: 0,
   };
 
+  const pricingGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+    gap: "16px",
+  };
+
+  const pricingCardStyle = {
+    border: "1px solid #e2e8f0",
+    borderRadius: "16px",
+    padding: "20px",
+    backgroundColor: "#ffffff",
+  };
+
+  const proCardStyle = {
+    ...pricingCardStyle,
+    border: "2px solid #2563eb",
+    boxShadow: "0 8px 24px rgba(37, 99, 235, 0.12)",
+  };
+
   return (
     <div style={appStyle}>
       <div style={containerStyle}>
-        <div style={headerStyle}>
-          <h1 style={titleStyle}>AI Crypto Trading Dashboard</h1>
-          <div style={subtitleStyle}>
-            Production-ready crypto signal dashboard with live signals,
-            performance analytics, and recent trade history.
+        <div style={heroStyle}>
+          <div style={heroTopStyle}>
+            <div>
+              <div
+                style={{
+                  ...badgeStyle,
+                  backgroundColor: "#1d4ed8",
+                  color: "#ffffff",
+                }}
+              >
+                LIVE CRYPTO SIGNAL SaaS
+              </div>
+              <h1 style={heroTitleStyle}>AI Crypto Trading Dashboard</h1>
+              <div style={heroSubtitleStyle}>
+                Real-time crypto signal delivery platform with Telegram alerts,
+                performance analytics, signal history, and premium upgrade flow.
+              </div>
+
+              <div style={ctaRowStyle}>
+                <a
+                  href={TELEGRAM_BOT_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={secondaryCtaStyle}
+                >
+                  Subscribe Free
+                </a>
+                <a
+                  href={TELEGRAM_CONTACT_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={primaryCtaStyle}
+                >
+                  Upgrade to Pro
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
         <div style={controlPanelStyle}>
           <div style={controlRowStyle}>
-            <select
-              value={coin}
-              onChange={(e) => setCoin(e.target.value)}
-              style={selectStyle}
-            >
-              <option value="BTC">BTC</option>
-              <option value="ETH">ETH</option>
-              <option value="SOL">SOL</option>
-            </select>
+            <div>
+              <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "8px" }}>
+                Selected Coin
+              </div>
+              <select
+                value={coin}
+                onChange={(e) => setCoin(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="BTC">BTC</option>
+                <option value="ETH">ETH</option>
+                <option value="SOL">SOL</option>
+              </select>
+            </div>
 
-            <button
-              onClick={fetchSignal}
-              style={primaryButtonStyle}
-              disabled={loadingSignal}
-            >
-              {loadingSignal ? "Loading..." : `Get ${coin} Signal`}
-            </button>
+            <div style={{ color: "#64748b", fontSize: "14px" }}>
+              Auto-refreshing dashboard every 60 seconds
+            </div>
           </div>
 
           {error && (
@@ -416,8 +505,9 @@ function App() {
               <h2 style={sectionTitleStyle}>Overall Strategy Performance</h2>
               <span
                 style={{
-                  ...badgeBaseStyle,
+                  ...badgeStyle,
                   backgroundColor: "#0f172a",
+                  color: "#ffffff",
                 }}
               >
                 ALL COINS
@@ -429,35 +519,30 @@ function App() {
                 <div style={cardLabel}>Total Trades</div>
                 <div style={cardValue}>{overallPerformance.total_trades}</div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Wins</div>
                 <div style={{ ...cardValue, color: "#22c55e" }}>
                   {overallPerformance.wins}
                 </div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Losses</div>
                 <div style={{ ...cardValue, color: "#ef4444" }}>
                   {overallPerformance.losses}
                 </div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Win Rate</div>
                 <div style={{ ...cardValue, color: "#38bdf8" }}>
                   {formatNumber(overallPerformance.win_rate)}%
                 </div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Profit %</div>
                 <div style={{ ...cardValue, color: "#22c55e" }}>
                   {formatNumber(overallPerformance.total_profit_pct)}%
                 </div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Avg RR</div>
                 <div style={{ ...cardValue, color: "#a78bfa" }}>
@@ -486,99 +571,116 @@ function App() {
           </div>
         )}
 
-        {data && (
-          <div style={panelStyle}>
-            <div style={panelHeaderStyle}>
-              <h2 style={sectionTitleStyle}>Latest Signal</h2>
-              <span
-                style={{
-                  ...badgeBaseStyle,
-                  backgroundColor: getSignalColor(data.signal),
-                }}
-              >
-                {data.signal || "HOLD"}
-              </span>
-            </div>
+        <div style={panelStyle}>
+          <div style={panelHeaderStyle}>
+            <h2 style={sectionTitleStyle}>Latest Signal</h2>
+            <span
+              style={{
+                ...badgeStyle,
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+              }}
+            >
+              {coin}
+            </span>
+          </div>
 
-            <div style={signalGridStyle}>
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Requested Coin</div>
-                <div style={valueStyle}>{data.requested_coin || coin}</div>
-              </div>
+          {loadingDashboard ? (
+            <p style={emptyTextStyle}>Loading latest signal...</p>
+          ) : !latestSignal ? (
+            <p style={emptyTextStyle}>No saved signal found yet for {coin}.</p>
+          ) : (
+            <>
+              <div style={signalGridStyle}>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Coin Used</div>
+                  <div style={valueStyle}>{latestSignal.coin_used || coin}</div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Coin Used</div>
-                <div style={valueStyle}>{data.coin_used || coin}</div>
-              </div>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Current Price</div>
+                  <div style={valueStyle}>
+                    {formatCurrency(latestSignal.current_price, 4)}
+                  </div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Current Price</div>
-                <div style={valueStyle}>{formatCurrency(data.current_price, 4)}</div>
-              </div>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Signal</div>
+                  <div
+                    style={{
+                      ...valueStyle,
+                      color: getSignalColor(latestSignal.signal),
+                    }}
+                  >
+                    {latestSignal.signal || "-"}
+                  </div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Entry</div>
-                <div style={valueStyle}>{formatCurrency(data.entry, 4)}</div>
-              </div>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Entry</div>
+                  <div style={valueStyle}>{formatCurrency(latestSignal.entry, 4)}</div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Stop</div>
-                <div style={valueStyle}>{formatCurrency(data.stop, 4)}</div>
-              </div>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Stop</div>
+                  <div style={valueStyle}>{formatCurrency(latestSignal.stop, 4)}</div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Target</div>
-                <div style={valueStyle}>{formatCurrency(data.target, 4)}</div>
-              </div>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Target</div>
+                  <div style={valueStyle}>{formatCurrency(latestSignal.target, 4)}</div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Status</div>
-                <div style={valueStyle}>{data.status || "UNKNOWN"}</div>
-              </div>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Status</div>
+                  <div
+                    style={{
+                      ...valueStyle,
+                      color: getStatusColor(latestSignal.status),
+                    }}
+                  >
+                    {latestSignal.status || "-"}
+                  </div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Confidence</div>
-                <div style={valueStyle}>{data.confidence || "N/A"}</div>
-              </div>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Confidence</div>
+                  <div style={valueStyle}>{latestSignal.confidence || "-"}</div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Interval</div>
-                <div style={valueStyle}>{data.interval || "-"}</div>
-              </div>
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Interval</div>
+                  <div style={valueStyle}>{latestSignal.interval || "-"}</div>
+                </div>
 
-              <div style={statCardStyle}>
-                <div style={labelStyle}>Candles Ago</div>
-                <div style={valueStyle}>
-                  {data.candles_ago !== null && data.candles_ago !== undefined
-                    ? data.candles_ago
-                    : "-"}
+                <div style={statCardStyle}>
+                  <div style={labelStyle}>Signal Time</div>
+                  <div style={valueStyle}>
+                    {formatSignalTime(latestSignal.signal_time)}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div style={{ ...mutedTextStyle, marginTop: "16px" }}>
-              <strong>Signal Time:</strong> {formatSignalTime(data.signal_time)}
-            </div>
-
-            <div style={chartWrapperStyle}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={latestChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="step" />
-                  <YAxis domain={["auto", "auto"]} />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="price"
-                    stroke="#2563eb"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
+              <div style={chartWrapperStyle}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={latestChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="step" />
+                    <YAxis domain={["auto", "auto"]} />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="price"
+                      stroke="#2563eb"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+        </div>
 
         {coinPerformance && (
           <div style={panelStyle}>
@@ -586,8 +688,9 @@ function App() {
               <h2 style={sectionTitleStyle}>Selected Coin Performance</h2>
               <span
                 style={{
-                  ...badgeBaseStyle,
+                  ...badgeStyle,
                   backgroundColor: "#2563eb",
+                  color: "#ffffff",
                 }}
               >
                 {coinPerformance.coin || coin}
@@ -599,35 +702,30 @@ function App() {
                 <div style={cardLabel}>Total Trades</div>
                 <div style={cardValue}>{coinPerformance.total_trades}</div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Wins</div>
                 <div style={{ ...cardValue, color: "#22c55e" }}>
                   {coinPerformance.wins}
                 </div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Losses</div>
                 <div style={{ ...cardValue, color: "#ef4444" }}>
                   {coinPerformance.losses}
                 </div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Win Rate</div>
                 <div style={{ ...cardValue, color: "#38bdf8" }}>
                   {formatNumber(coinPerformance.win_rate)}%
                 </div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Profit %</div>
                 <div style={{ ...cardValue, color: "#22c55e" }}>
                   {formatNumber(coinPerformance.total_profit_pct)}%
                 </div>
               </div>
-
               <div style={darkCardStyle}>
                 <div style={cardLabel}>Avg RR</div>
                 <div style={{ ...cardValue, color: "#a78bfa" }}>
@@ -661,8 +759,9 @@ function App() {
             <h2 style={sectionTitleStyle}>Recent Signal History</h2>
             <span
               style={{
-                ...badgeBaseStyle,
+                ...badgeStyle,
                 backgroundColor: "#0f172a",
+                color: "#ffffff",
               }}
             >
               ALL COINS
@@ -685,8 +784,9 @@ function App() {
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       <span
                         style={{
-                          ...badgeBaseStyle,
+                          ...badgeStyle,
                           backgroundColor: getSignalColor(item.signal),
+                          color: "#ffffff",
                         }}
                       >
                         {item.signal}
@@ -694,8 +794,9 @@ function App() {
 
                       <span
                         style={{
-                          ...badgeBaseStyle,
+                          ...badgeStyle,
                           backgroundColor: getStatusColor(item.status),
+                          color: "#ffffff",
                         }}
                       >
                         {item.status}
@@ -737,6 +838,86 @@ function App() {
               ))}
             </div>
           )}
+        </div>
+
+        <div style={panelStyle}>
+          <div style={panelHeaderStyle}>
+            <h2 style={sectionTitleStyle}>Plans</h2>
+            <span
+              style={{
+                ...badgeStyle,
+                backgroundColor: "#1d4ed8",
+                color: "#ffffff",
+              }}
+            >
+              START FREE
+            </span>
+          </div>
+
+          <div style={pricingGridStyle}>
+            <div style={pricingCardStyle}>
+              <div
+                style={{
+                  ...badgeStyle,
+                  backgroundColor: "#e2e8f0",
+                  color: "#0f172a",
+                  marginBottom: "14px",
+                }}
+              >
+                FREE
+              </div>
+              <h3 style={{ marginTop: 0, color: "#0f172a" }}>Starter Access</h3>
+              <p style={{ color: "#475569", lineHeight: 1.7 }}>
+                Get access to BTC, ETH, and SOL alerts with basic strategy
+                signals and limited coverage.
+              </p>
+              <div style={{ color: "#334155", lineHeight: 1.9 }}>
+                ✔ BTC / ETH / SOL alerts<br />
+                ✔ Basic strategy signals<br />
+                ✔ Limited alert coverage
+              </div>
+              <a
+                href={TELEGRAM_BOT_URL}
+                target="_blank"
+                rel="noreferrer"
+                style={{ ...primaryCtaStyle, marginTop: "16px" }}
+              >
+                Join Free
+              </a>
+            </div>
+
+            <div style={proCardStyle}>
+              <div
+                style={{
+                  ...badgeStyle,
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  marginBottom: "14px",
+                }}
+              >
+                PRO
+              </div>
+              <h3 style={{ marginTop: 0, color: "#0f172a" }}>Premium Access</h3>
+              <p style={{ color: "#475569", lineHeight: 1.7 }}>
+                Unlock real-time alerts, more markets, AI-enhanced trade calls,
+                market updates, and premium signal delivery.
+              </p>
+              <div style={{ color: "#334155", lineHeight: 1.9 }}>
+                ✔ Real-time premium alerts<br />
+                ✔ More coins & timeframes<br />
+                ✔ AI-enhanced trade signals<br />
+                ✔ Market & macro updates
+              </div>
+              <a
+                href={TELEGRAM_CONTACT_URL}
+                target="_blank"
+                rel="noreferrer"
+                style={{ ...primaryCtaStyle, marginTop: "16px" }}
+              >
+                Upgrade to Pro
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </div>

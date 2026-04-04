@@ -464,7 +464,7 @@ You are now on the FREE plan.
 ━━━━━━━━━━━━━━━
 🚀 Upgrade
 ━━━━━━━━━━━━━━━
-👉 Contact: @YourTelegramUsername
+👉 Contact: @Anir3103
 """
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
