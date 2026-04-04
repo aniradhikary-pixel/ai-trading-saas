@@ -13,6 +13,7 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Existing table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS signal_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,6 +37,19 @@ def init_db():
             signal_time INTEGER,
             candles_ago INTEGER,
             fetched_at TEXT
+        )
+    """)
+
+    # 🔥 NEW TABLE (IMPORTANT)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS subscribers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_chat_id TEXT UNIQUE,
+            telegram_username TEXT,
+            full_name TEXT,
+            plan TEXT DEFAULT 'free',
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT
         )
     """)
 

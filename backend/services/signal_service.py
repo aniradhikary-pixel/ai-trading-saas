@@ -8,7 +8,6 @@ import pandas as pd
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 BASE_URL = "https://data-api.binance.vision"
 
@@ -38,8 +37,6 @@ COIN_CONFIG = {
         "stop_pct": 0.015,
     },
 }
-
-from database import get_connection
 
 
 def save_signal_to_db(signal_data: dict):
@@ -145,9 +142,9 @@ def save_signal_to_db(signal_data: dict):
         conn.close()
         return True
     
-def send_telegram_alert(signal_data: dict):
+def send_telegram_alert_to_user(chat_id, signal_data: dict):
     try:
-        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        if not TELEGRAM_BOT_TOKEN:
             print("Telegram credentials missing in .env")
             return None
 
@@ -175,7 +172,7 @@ Signal Time: {readable_time}
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
         payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
+            "chat_id": chat_id,
             "text": message
         }
 
@@ -185,6 +182,33 @@ Signal Time: {readable_time}
     except Exception as e:
         print("Telegram error:", e)
         return None
+    
+def broadcast_signal(signal_data):
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT telegram_chat_id, plan
+        FROM subscribers
+        WHERE is_active = 1
+    """)
+
+    users = cursor.fetchall()
+    conn.close()
+
+    allowed_free_coins = {"BTC", "ETH", "SOL"}
+    coin = signal_data.get("coin_used")
+
+    for user in users:
+        chat_id = user["telegram_chat_id"]
+        plan = user["plan"]
+
+        # Free users → limited
+        if plan == "free" and coin not in allowed_free_coins:
+            continue
+
+        send_telegram_alert_to_user(chat_id, signal_data)
     
 def get_klines(symbol: str, interval: str, limit: int = 300) -> pd.DataFrame:
     url = f"{BASE_URL}/api/v3/klines"
@@ -390,11 +414,60 @@ def run_auto_signal_scan():
             is_new_trade = save_signal_to_db(final_result)
 
             if is_new_trade:
-                send_telegram_alert(final_result)
-                print(f"New trade alert sent for {coin}")
+                broadcast_signal(final_result)
+                print(f"New trade broadcast sent for {coin}")
             else:
                 print(f"No new trade for {coin}")
 
         except Exception as e:
             print(f"Auto scan error for {coin}: {e}")
 
+def add_subscriber(chat_id, username=None, full_name=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT OR IGNORE INTO subscribers (
+            telegram_chat_id, telegram_username, full_name, plan, is_active, created_at
+        )
+        VALUES (?, ?, ?, 'free', 1, datetime('now'))
+    """, (str(chat_id), username, full_name))
+
+    conn.commit()
+    conn.close()
+
+def send_welcome_message(chat_id):
+    message = """
+🚀 Welcome to AI Trading Signals
+
+You are now on the FREE plan.
+
+━━━━━━━━━━━━━━━
+🆓 FREE PLAN
+━━━━━━━━━━━━━━━
+✔ Signals for BTC, ETH, SOL  
+✔ Limited alerts  
+✔ Basic strategy signals  
+
+━━━━━━━━━━━━━━━
+💎 PRO PLAN
+━━━━━━━━━━━━━━━
+🔥 Real-time alerts  
+🔥 More coins & timeframes  
+🔥 AI-powered signals  
+🔥 Market updates  
+
+━━━━━━━━━━━━━━━
+🚀 Upgrade
+━━━━━━━━━━━━━━━
+👉 Contact: @YourTelegramUsername
+"""
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+    payload = {
+        "chat_id": chat_id,
+        "text": message
+    }
+
+    requests.post(url, data=payload, timeout=10)
