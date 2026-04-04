@@ -10,8 +10,8 @@ import {
 } from "recharts";
 
 const API_BASE_URL = "https://ai-trading-saas-production.up.railway.app";
-const TELEGRAM_BOT_URL = "https://t.me/@AICryptoTradingSignal_bot";
-const TELEGRAM_CONTACT_URL = "https://t.me/@Anir3103";
+const TELEGRAM_BOT_URL = "https://t.me/AICryptoTradingSignal_bot";
+const TELEGRAM_CONTACT_URL = "https://t.me/Anir3103";
 
 function App() {
   const [coin, setCoin] = useState("BTC");
