@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+const IS_ADMIN = false; // change to true only for view analytics
 const API_BASE_URL = "https://ai-trading-saas-production.up.railway.app";
 const TELEGRAM_BOT_URL = "https://t.me/AICryptoTradingSignal_bot?start=free";
 const TELEGRAM_CONTACT_URL = "https://t.me/Anir3103";
@@ -572,7 +573,7 @@ function App() {
             </div>
           </div>
         </div>
-
+      {IS_ADMIN && (
         <div style={panelStyle}>
           <div style={panelHeaderStyle}>
             <h2 style={sectionTitleStyle}>Founder Analytics Dashboard</h2>
@@ -633,7 +634,8 @@ function App() {
             </div>
           </div>
         </div>
-
+      )}
+    
         <div style={controlPanelStyle}>
           <div style={controlRowStyle}>
             <div>
