@@ -64,7 +64,7 @@ def init_db():
                     id SERIAL PRIMARY KEY,
                     full_name TEXT NOT NULL,
                     email TEXT NOT NULL,
-                    lead_token TEXT UNIQUE
+                    lead_token TEXT UNIQUE,
                     plan_interest TEXT DEFAULT 'free',
                     source TEXT DEFAULT 'website',
                     created_at TEXT
