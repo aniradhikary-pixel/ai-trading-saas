@@ -14,7 +14,7 @@ PGDATABASE = (os.getenv("PGDATABASE") or "").strip()
 def get_connection():
     if not all([PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE]):
         raise RuntimeError("One or more PG* variables are missing")
-    
+
     print("PGHOST:", PGHOST)
     print("PGPORT:", PGPORT)
     print("PGUSER present:", bool(PGUSER))
@@ -29,8 +29,6 @@ def get_connection():
         row_factory=dict_row,
         sslmode="require",
     )
-
-
 
 def init_db():
     with get_connection() as conn:

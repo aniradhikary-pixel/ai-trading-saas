@@ -282,7 +282,6 @@ def debug_subscribers():
 
     return [dict(row) for row in rows]
 
-from database import DATABASE_URL
 
 @router.get("/debug-db-info")
 def debug_db_info():
@@ -301,9 +300,8 @@ def debug_db_info():
     conn.close()
 
     return {
-        "database_url_present": bool(DATABASE_URL),
+        "database_connection_ok": True,
         "signal_history_count": signal_count,
         "subscribers_count": subscriber_count,
         "leads_count": lead_count,
     }
-    
