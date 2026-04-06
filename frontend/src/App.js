@@ -822,7 +822,7 @@ function App() {
                 <div style={statCardStyle}>
                   <div style={labelStyle}>Signal Time</div>
                   <div style={valueStyle}>
-                    {formatSignalTime(latestSignal.signal_time)}
+                    {latestSignal.signal_time_readable || formatSignalTime(latestSignal.signal_time)}
                   </div>
                 </div>
               </div>
@@ -994,11 +994,13 @@ function App() {
                   </div>
 
                   <div style={mutedTextStyle}>
-                    <strong>Signal Time:</strong> {formatSignalTime(item.signal_time)}
+                    <strong>Signal Time:</strong> {item.signal_time_readable || formatSignalTime(item.signal_time)}
                   </div>
 
                   <div style={{ ...mutedTextStyle, color: "#94a3b8" }}>
-                    <strong>Fetched At:</strong> {item.fetched_at || "-"}
+                    <strong>Fetched At:</strong> {
+                      item.fetched_at ? new Date(item.fetched_at).toLocaleString() : "-"
+                    }
                   </div>
                 </div>
               ))}

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, EmailStr
 
 from services.signal_service import (
@@ -7,6 +7,7 @@ from services.signal_service import (
     save_signal_to_db,
     add_subscriber,
     send_welcome_message,
+    broadcast_signal,
 )
 from database import get_connection
 
@@ -66,7 +67,7 @@ async def telegram_webhook(request: Request):
 def get_signal(coin: str):
     result = generate_trading_signal(coin=coin)
 
-    fetched_at = datetime.now().strftime("%d/%m/%Y, %I:%M:%S %p")
+    fetched_at = datetime.now(timezone.utc).isoformat()
 
     final_result = {
         **result,
@@ -74,7 +75,10 @@ def get_signal(coin: str):
     }
 
     if "error" not in final_result:
-        save_signal_to_db(final_result)
+        is_new_trade = save_signal_to_db(final_result)
+
+        if is_new_trade:
+            broadcast_signal(final_result)
 
     return final_result
 

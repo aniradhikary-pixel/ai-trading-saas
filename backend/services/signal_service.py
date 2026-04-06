@@ -1,6 +1,6 @@
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from database import get_connection
 import pandas as pd
@@ -392,6 +392,7 @@ def generate_trading_signal(coin: str = "BTC") -> dict:
             "signal_time": int(signal_time) if signal_time is not None else None,
             "candles_ago": candles_ago,
             "recent_prices": recent_prices,
+            "signal_time_readable": datetime.fromtimestamp(signal_time / 1000, tz=timezone.utc).isoformat() if signal_time is not None else None,
         }
     except Exception as e:
         return {"error": str(e)}
@@ -408,7 +409,7 @@ def run_auto_signal_scan():
                 continue
 
             from datetime import datetime
-            fetched_at = datetime.now().strftime("%d/%m/%Y, %I:%M:%S %p")
+            fetched_at = datetime.now(timezone.utc).isoformat()
 
             final_result = {
                 **result,
