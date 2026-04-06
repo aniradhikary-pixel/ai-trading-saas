@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 from datetime import datetime, timezone
 from pydantic import BaseModel, EmailStr
+import secrets
 
 from services.signal_service import (
     generate_trading_signal,
@@ -13,23 +14,28 @@ from database import get_connection
 
 router = APIRouter()
 
+
 class LeadRequest(BaseModel):
     full_name: str
     email: EmailStr
+
 
 @router.post("/subscribe")
 def subscribe_lead(payload: LeadRequest):
     conn = get_connection()
     cursor = conn.cursor()
 
+    lead_token = secrets.token_urlsafe(16)
+
     cursor.execute("""
         INSERT INTO leads (
-            full_name, email, plan_interest, source, created_at
+            full_name, email, lead_token, plan_interest, source, created_at
         )
-        VALUES (%s, %s, 'free', 'website', NOW()::text)
+        VALUES (%s, %s, %s, 'free', 'website', NOW()::text)
     """, (
-        payload.full_name,
-        payload.email,
+        payload.full_name.strip(),
+        payload.email.strip().lower(),
+        lead_token,
     ))
 
     conn.commit()
@@ -37,8 +43,9 @@ def subscribe_lead(payload: LeadRequest):
 
     return {
         "message": "Lead captured successfully",
-        "telegram_bot_url": "https://t.me/AICryptoTradingSignal_bot?start=free"
+        "telegram_bot_url": f"https://t.me/AICryptoTradingSignal_bot?start={lead_token}"
     }
+
 
 @router.post("/telegram/webhook")
 async def telegram_webhook(request: Request):
@@ -52,16 +59,42 @@ async def telegram_webhook(request: Request):
     chat_id = chat.get("id")
     username = chat.get("username")
 
-    full_name = " ".join(filter(None, [
+    telegram_name = " ".join(filter(None, [
         chat.get("first_name"),
         chat.get("last_name")
-    ]))
+    ])).strip()
 
-    if text and text.startswith("/start") and chat_id:
-        add_subscriber(chat_id, username, full_name)
+    lead_token = None
+    if text and text.startswith("/start"):
+        parts = text.split(maxsplit=1)
+        if len(parts) > 1:
+            lead_token = parts[1].strip()
+
+    subscriber_name = telegram_name
+
+    if lead_token:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT full_name
+            FROM leads
+            WHERE lead_token = %s
+            ORDER BY id DESC
+            LIMIT 1
+        """, (lead_token,))
+        lead = cursor.fetchone()
+        conn.close()
+
+        if lead and lead.get("full_name"):
+            subscriber_name = lead["full_name"]
+
+    if chat_id and text and text.startswith("/start"):
+        add_subscriber(chat_id, username, subscriber_name)
         send_welcome_message(chat_id)
 
     return {"ok": True}
+
 
 @router.get("/signal/{coin}")
 def get_signal(coin: str):
@@ -82,6 +115,7 @@ def get_signal(coin: str):
 
     return final_result
 
+
 @router.get("/latest-signal/{coin}")
 def get_latest_signal(coin: str):
     conn = get_connection()
@@ -99,6 +133,7 @@ def get_latest_signal(coin: str):
     conn.close()
 
     return dict(row) if row else {}
+
 
 @router.get("/history/{coin}")
 def get_history(coin: str):
@@ -118,6 +153,7 @@ def get_history(coin: str):
 
     return [dict(row) for row in rows]
 
+
 @router.get("/history")
 def get_history_all():
     conn = get_connection()
@@ -134,6 +170,7 @@ def get_history_all():
     conn.close()
 
     return [dict(row) for row in rows]
+
 
 def calculate_performance(rows, coin_label="ALL"):
     closed_trades = [
@@ -232,6 +269,7 @@ def get_performance(coin: str):
 
     return calculate_performance(rows, coin_label=coin.upper())
 
+
 @router.get("/analytics")
 def get_analytics():
     conn = get_connection()
@@ -258,6 +296,7 @@ def get_analytics():
         "pro_users": pro_users,
         "revenue": revenue
     }
+
 
 @router.get("/debug-leads")
 def debug_leads():
