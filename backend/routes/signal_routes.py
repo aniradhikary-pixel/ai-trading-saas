@@ -258,3 +258,26 @@ def get_analytics():
         "pro_users": pro_users,
         "revenue": revenue
     }
+
+@router.get("/debug-leads")
+def debug_leads():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM leads ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+
+@router.get("/debug-subscribers")
+def debug_subscribers():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM subscribers ORDER BY id DESC")
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
