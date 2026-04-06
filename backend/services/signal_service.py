@@ -46,7 +46,7 @@ def save_signal_to_db(signal_data: dict):
     cursor.execute("""
         SELECT *
         FROM signal_history
-        WHERE coin_used = ?
+        WHERE coin_used = %s
         ORDER BY id DESC
         LIMIT 1
     """, (signal_data.get("coin_used"),))
@@ -65,24 +65,24 @@ def save_signal_to_db(signal_data: dict):
     if same_trade:
         cursor.execute("""
             UPDATE signal_history
-            SET requested_coin = ?,
-                symbol = ?,
-                interval = ?,
-                strategy = ?,
-                current_price = ?,
-                ema_fast = ?,
-                ema_slow = ?,
-                ema200 = ?,
-                rr = ?,
-                stop_pct = ?,
-                entry = ?,
-                stop = ?,
-                target = ?,
-                status = ?,
-                confidence = ?,
-                candles_ago = ?,
-                fetched_at = ?
-            WHERE id = ?
+            SET requested_coin = %s,
+                symbol = %s,
+                interval = %s,
+                strategy = %s,
+                current_price = %s,
+                ema_fast = %s,
+                ema_slow = %s,
+                ema200 = %s,
+                rr = %s,
+                stop_pct = %s,
+                entry = %s,
+                stop = %s,
+                target = %s,
+                status = %s,
+                confidence = %s,
+                candles_ago = %s,
+                fetched_at = %s
+            WHERE id = %s
         """, (
             signal_data.get("requested_coin"),
             signal_data.get("symbol"),
@@ -115,7 +115,7 @@ def save_signal_to_db(signal_data: dict):
                 rr, stop_pct, entry, stop, target,
                 status, confidence, signal_time, candles_ago, fetched_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             signal_data.get("requested_coin"),
             signal_data.get("coin_used"),
@@ -432,10 +432,11 @@ def add_subscriber(chat_id, username=None, full_name=None):
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT OR IGNORE INTO subscribers (
+        INSERT INTO subscribers (
             telegram_chat_id, telegram_username, full_name, plan, is_active, created_at
         )
-        VALUES (?, ?, ?, 'free', 1, datetime('now'))
+        VALUES (%s, %s, %s, 'free', 1, NOW()::text)
+        ON CONFLICT (telegram_chat_id) DO NOTHING
     """, (str(chat_id), username, full_name))
 
     conn.commit()

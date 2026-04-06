@@ -26,7 +26,7 @@ def subscribe_lead(payload: LeadRequest):
         INSERT INTO leads (
             full_name, email, plan_interest, source, created_at
         )
-        VALUES (?, ?, 'free', 'website', datetime('now'))
+        VALUES (%s, %s, 'free', 'website', NOW()::text)
     """, (
         payload.full_name,
         payload.email,
@@ -90,7 +90,7 @@ def get_latest_signal(coin: str):
     cursor.execute("""
         SELECT *
         FROM signal_history
-        WHERE coin_used = ?
+        WHERE coin_used = %s
         ORDER BY id DESC
         LIMIT 1
     """, (coin.upper(),))
@@ -108,7 +108,7 @@ def get_history(coin: str):
     cursor.execute("""
         SELECT *
         FROM signal_history
-        WHERE coin_used = ?
+        WHERE coin_used = %s
         ORDER BY id DESC
         LIMIT 20
     """, (coin.upper(),))
@@ -223,7 +223,7 @@ def get_performance(coin: str):
     cursor.execute("""
         SELECT *
         FROM signal_history
-        WHERE coin_used = ?
+        WHERE coin_used = %s
         ORDER BY id ASC
     """, (coin.upper(),))
 
@@ -282,8 +282,7 @@ def debug_subscribers():
 
     return [dict(row) for row in rows]
 
-from pathlib import Path
-from database import DB_NAME
+from database import DATABASE_URL
 
 @router.get("/debug-db-info")
 def debug_db_info():
@@ -302,9 +301,9 @@ def debug_db_info():
     conn.close()
 
     return {
-        "db_path": str(DB_NAME),
-        "db_exists": Path(DB_NAME).exists(),
+        "database_url_present": bool(DATABASE_URL),
         "signal_history_count": signal_count,
         "subscribers_count": subscriber_count,
         "leads_count": lead_count,
     }
+    
