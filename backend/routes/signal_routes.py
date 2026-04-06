@@ -281,3 +281,30 @@ def debug_subscribers():
     conn.close()
 
     return [dict(row) for row in rows]
+
+from pathlib import Path
+from database import DB_NAME
+
+@router.get("/debug-db-info")
+def debug_db_info():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) as count FROM signal_history")
+    signal_count = cursor.fetchone()["count"]
+
+    cursor.execute("SELECT COUNT(*) as count FROM subscribers")
+    subscriber_count = cursor.fetchone()["count"]
+
+    cursor.execute("SELECT COUNT(*) as count FROM leads")
+    lead_count = cursor.fetchone()["count"]
+
+    conn.close()
+
+    return {
+        "db_path": str(DB_NAME),
+        "db_exists": Path(DB_NAME).exists(),
+        "signal_history_count": signal_count,
+        "subscribers_count": subscriber_count,
+        "leads_count": lead_count,
+    }
