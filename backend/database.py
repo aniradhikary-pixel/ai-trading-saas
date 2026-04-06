@@ -5,29 +5,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-PGHOST = (os.getenv("PGHOST") or "").strip()
-PGPORT = (os.getenv("PGPORT") or "").strip()
-PGUSER = (os.getenv("PGUSER") or "").strip()
-PGPASSWORD = (os.getenv("PGPASSWORD") or "").strip()
-PGDATABASE = (os.getenv("PGDATABASE") or "").strip()
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
 
 def get_connection():
-    if not all([PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE]):
-        raise RuntimeError("One or more PG* variables are missing")
-
-    print("PGHOST:", PGHOST)
-    print("PGPORT:", PGPORT)
-    print("PGUSER present:", bool(PGUSER))
-    print("PGDATABASE:", PGDATABASE)
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not set")
 
     return psycopg.connect(
-        host=PGHOST,
-        port=PGPORT,
-        user=PGUSER,
-        password=PGPASSWORD,
-        dbname=PGDATABASE,
+        DATABASE_URL,
         row_factory=dict_row,
-        sslmode="require",
+        sslmode="require"
     )
 
 def init_db():
